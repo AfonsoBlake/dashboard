@@ -1,0 +1,1 @@
+ALTER TABLE public.profiles ADD COLUMN custom_business_description text;
