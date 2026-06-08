@@ -15,48 +15,48 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function InboxPauseAllButton() {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const [total, setTotal] = useState(0);
   const [pausedCount, setPausedCount] = useState(0);
   const [busy, setBusy] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!gymId) return;
+    if (!businessId) return;
     const { data, error } = await (supabase as any)
       .from("contacts")
       .select("ai_paused")
-      .eq("business_id", gymId);
+      .eq("business_id", businessId);
     if (error || !data) return;
     setTotal(data.length);
     setPausedCount(
       data.filter((r: { ai_paused: boolean | null }) => r.ai_paused === true).length,
     );
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     refresh();
   }, [refresh]);
 
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     const channel = supabase
-      .channel(`inbox-pauseall-${gymId}`)
+      .channel(`inbox-pauseall-${businessId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "contacts", filter: `business_id=eq.${gymId}` },
+        { event: "*", schema: "public", table: "contacts", filter: `business_id=eq.${businessId}` },
         () => refresh(),
       )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [gymId, refresh]);
+  }, [businessId, refresh]);
 
   const allPaused = total > 0 && pausedCount === total;
 
   async function setAll(paused: boolean) {
-    if (!gymId) return;
+    if (!businessId) return;
     setBusy(true);
     const payload: { ai_paused: boolean; ai_paused_at: string | null } = {
       ai_paused: paused,
@@ -65,7 +65,7 @@ export function InboxPauseAllButton() {
     const { error } = await (supabase as any)
       .from("contacts")
       .update(payload)
-      .eq("business_id", gymId);
+      .eq("business_id", businessId);
     setBusy(false);
     setDialogOpen(false);
     if (error) {
@@ -101,7 +101,7 @@ export function InboxPauseAllButton() {
           <AlertDialogHeader>
             <AlertDialogTitle>Pause AI for all conversations?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will pause AI auto-replies for all {total} conversations in this gym. Replies
+              This will pause AI auto-replies for all {total} conversations in this business. Replies
               will be manual only until you resume.
             </AlertDialogDescription>
           </AlertDialogHeader>

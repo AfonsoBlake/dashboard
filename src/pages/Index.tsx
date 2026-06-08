@@ -174,7 +174,7 @@ function buildMonthGrid(date: Date, bookings: BookingRow[]) {
     const d = new Date(b.created_at);
     if (d.getFullYear() === year && d.getMonth() === month) {
       const key = d.getDate();
-      const label = `${b.preferred_time ?? ""} ${b.name ?? "Lead"}`.trim();
+      const label = `${b.booking_time ?? ""} ${b.name ?? "Lead"}`.trim();
       const arr = eventsByDay.get(key) ?? [];
       arr.push(label);
       eventsByDay.set(key, arr);
@@ -235,12 +235,15 @@ function buildWeekEvents(weekStart: Date, bookings: BookingRow[]): WeekEvent[] {
 
   bookings.forEach(b => {
     let dayIdx: number | null = null;
-    let hour: number | null = parseBookingHour(b.preferred_time);
+    let hour: number | null = parseBookingHour(b.booking_time);
 
-    // Prefer preferred_day name when within current week (using created_at week if matches)
-    if (b.preferred_day) {
+    // Prefer the booking_date's weekday when within current week (using created_at week if matches)
+    const bookingDayName = b.booking_date
+      ? DAY_NAMES[new Date(b.booking_date).getDay()]
+      : null;
+    if (bookingDayName) {
       const idx = DAY_NAMES.findIndex(
-        d => d.toLowerCase() === (b.preferred_day ?? "").trim().toLowerCase(),
+        d => d.toLowerCase() === bookingDayName.trim().toLowerCase(),
       );
       if (idx >= 0) dayIdx = idx;
     }
@@ -270,7 +273,7 @@ function buildWeekEvents(weekStart: Date, bookings: BookingRow[]): WeekEvent[] {
     events.push({
       id: b.id,
       name: b.name ?? "Lead",
-      time: b.preferred_time ?? "",
+      time: b.booking_time ?? "",
       dayIdx,
       hour,
     });
@@ -282,7 +285,7 @@ function buildWeekEvents(weekStart: Date, bookings: BookingRow[]): WeekEvent[] {
 const Index = () => {
   const { theme, setTheme, themes } = useTheme();
   const { user, signOut } = useAuth();
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const { industry, industryId, setIndustryId, customDescription } = useIndustry();
   const { unreadCount: feedbackUnread } = useFeedback();
   const [inviteCode, setInviteCode] = useState<string>("");
@@ -394,8 +397,8 @@ const Index = () => {
     const current = (booking.status ?? "").toLowerCase();
     if (current === nextStatus.toLowerCase()) return;
     setUpdatingBookingId(booking.id);
-    if (!gymId) {
-      toast.error("No gym selected for this account.");
+    if (!businessId) {
+      toast.error("No business selected for this account.");
       setUpdatingBookingId(null);
       return;
     }
@@ -403,7 +406,7 @@ const Index = () => {
       .from("bookings")
       .update({ status: nextStatus })
       .eq("id", booking.id)
-      .eq("business_id", gymId);
+      .eq("business_id", businessId);
 
     if (error) {
       toast.error(`Could not update status: ${error.message}`);
@@ -481,84 +484,84 @@ const Index = () => {
     : navigation;
 
   useEffect(() => {
-    if (!gymId) {
+    if (!businessId) {
       setInviteCode("");
       return;
     }
     let cancelled = false;
     (async () => {
-      const { data: gymRow, error: gymErr } = await supabase
-        .from("gyms")
+      const { data: businessRow, error: bizErr } = await supabase
+        .from("businesses")
         .select("invite_code")
-        .eq("id", gymId)
+        .eq("id", businessId)
         .maybeSingle();
       if (cancelled) return;
-      if (gymErr) {
-        toast.error(`Could not load invite code: ${gymErr.message}`);
+      if (bizErr) {
+        toast.error(`Could not load invite code: ${bizErr.message}`);
         return;
       }
-      setInviteCode(gymRow?.invite_code ?? "");
+      setInviteCode(businessRow?.invite_code ?? "");
     })();
     return () => { cancelled = true; };
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
-    if (!gymId) { setStaffInviteCode(""); return; }
+    if (!businessId) { setStaffInviteCode(""); return; }
     let cancelled = false;
     (async () => {
       const { data } = await (supabase as any)
-        .from("gyms")
+        .from("businesses")
         .select("staff_invite_code")
-        .eq("id", gymId)
+        .eq("id", businessId)
         .maybeSingle();
       if (cancelled) return;
       setStaffInviteCode(data?.staff_invite_code ?? "");
     })();
     return () => { cancelled = true; };
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     if (!user) { setUserRole(null); return; }
     (async () => {
       const { data } = await supabase
-        .from("user_roles")
+        .from("profiles")
         .select("role")
-        .eq("user_id", user.id)
+        .eq("id", user.id)
         .maybeSingle();
       setUserRole((data?.role as "admin" | "manager" | "user") ?? null);
     })();
   }, [user]);
 
   useEffect(() => {
-    if (!gymId) {
+    if (!businessId) {
       setWelcomeGymName("");
       return;
     }
     let cancelled = false;
     (async () => {
       const { data, error } = await supabase
-        .from("gyms")
-        .select("name, display_name")
-        .eq("id", gymId)
+        .from("businesses")
+        .select("display_name")
+        .eq("id", businessId)
         .maybeSingle();
       if (cancelled || error) return;
-      setWelcomeGymName(data?.display_name ?? data?.name ?? "");
+      setWelcomeGymName(data?.display_name ?? "");
     })();
     return () => { cancelled = true; };
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     if (customDescription) setTempCustomDesc(customDescription);
   }, [customDescription]);
 
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     let cancelled = false;
     (async () => {
       const { data: rawCfg } = await (supabase as any)
         .from("business_configs")
         .select("qualification_strictness, bad_lead_definition, repeated_questions, lead_silent_hours, specific_keywords, follow_up_enabled, follow_up_delay_hours, follow_up_max, follow_up_tone, ai_name, persona, knowledge, goals, demo_mode, demo_trigger_word, qualification_questions, escalation_rules, contact_phone, contact_email, escalation_channel")
-        .eq("business_id", gymId)
+        .eq("business_id", businessId)
         .maybeSingle();
       if (cancelled || !rawCfg) return;
       if (rawCfg.qualification_strictness) setQualificationStrictness(rawCfg.qualification_strictness);
@@ -599,108 +602,81 @@ const Index = () => {
       if (rawCfg.escalation_channel) setEscalationChannel(rawCfg.escalation_channel as "email" | "sms" | "whatsapp" | "instagram");
     })();
     return () => { cancelled = true; };
-  }, [gymId]);
+  }, [businessId]);
 
   const upsertBusinessConfig = async (patch: Record<string, unknown>) => {
-    if (!gymId) return;
+    if (!businessId) return;
     await (supabase as any)
       .from("business_configs")
-      .upsert({ business_id: gymId, ...patch }, { onConflict: "business_id" });
+      .upsert({ business_id: businessId, ...patch }, { onConflict: "business_id" });
   };
 
   const saveQualification = useCallback(async () => {
-    if (!gymId) return;
+    if (!businessId) return;
     await (supabase as any)
       .from("business_configs")
-      .upsert({ business_id: gymId, qualification_strictness: qualificationStrictness, bad_lead_definition: badLeadDefinition || null }, { onConflict: "business_id" });
-  }, [gymId, qualificationStrictness, badLeadDefinition]);
+      .upsert({ business_id: businessId, qualification_strictness: qualificationStrictness, bad_lead_definition: badLeadDefinition || null }, { onConflict: "business_id" });
+  }, [businessId, qualificationStrictness, badLeadDefinition]);
 
   const saveLeadSilentHours = useCallback(async (hours: number | null) => {
-    if (!gymId) return;
-    await (supabase as any).from("business_configs").upsert({ business_id: gymId, lead_silent_hours: hours }, { onConflict: "business_id" });
-  }, [gymId]);
+    if (!businessId) return;
+    await (supabase as any).from("business_configs").upsert({ business_id: businessId, lead_silent_hours: hours }, { onConflict: "business_id" });
+  }, [businessId]);
 
   const saveSpecificKeywords = useCallback(async (keywords: string[]) => {
-    if (!gymId) return;
-    await (supabase as any).from("business_configs").upsert({ business_id: gymId, specific_keywords: keywords }, { onConflict: "business_id" });
-  }, [gymId]);
+    if (!businessId) return;
+    await (supabase as any).from("business_configs").upsert({ business_id: businessId, specific_keywords: keywords }, { onConflict: "business_id" });
+  }, [businessId]);
 
   const saveFollowUp = useCallback(async (enabled: boolean, delayHours: number, max: number, tone: string) => {
-    if (!gymId) return;
+    if (!businessId) return;
     const { error } = await (supabase as any).from("business_configs").upsert(
-      { business_id: gymId, follow_up_enabled: enabled, follow_up_delay_hours: delayHours, follow_up_max: max, follow_up_tone: tone },
+      { business_id: businessId, follow_up_enabled: enabled, follow_up_delay_hours: delayHours, follow_up_max: max, follow_up_tone: tone },
       { onConflict: "business_id" },
     );
     if (error) toast.error(`Could not save: ${error.message}`);
     else toast.success("Saved");
-  }, [gymId]);
+  }, [businessId]);
 
   const regenerateInviteCode = async () => {
-    if (!gymId) {
-      toast.error("No gym is linked to your account.");
+    if (!user) {
+      toast.error("No business is linked to your account.");
       return;
     }
     setInviteLoading(true);
 
-    // Capture the previous code so we can roll back if CC update fails.
-    const { data: prevRow, error: prevErr } = await supabase
-      .from("gyms")
-      .select("invite_code")
-      .eq("id", gymId)
-      .maybeSingle();
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("business_id, role")
+      .eq("id", user.id)
+      .single();
 
-    if (prevErr) {
+    if (profileErr || !profile?.business_id) {
       setInviteLoading(false);
-      toast.error(`Could not read current code: ${prevErr.message}`);
-      return;
-    }
-    if (!prevRow) {
-      setInviteLoading(false);
-      toast.error("Gym row not found — could not save code.");
-      return;
-    }
-    const previousCode = prevRow.invite_code ?? null;
-
-    const code = "FLR-" + generateCode();
-
-    // 1) Update primary (BETTeR Zap).
-    const { data: updated, error } = await supabase
-      .from("gyms")
-      .update({ invite_code: code })
-      .eq("id", gymId)
-      .select("invite_code")
-      .maybeSingle();
-
-    if (error) {
-      setInviteLoading(false);
-      toast.error(`Could not regenerate code: ${error.message}`);
-      return;
-    }
-    if (!updated) {
-      setInviteLoading(false);
-      toast.error("Gym row not found — could not save code.");
+      toast.error("No business is linked to your account.");
       return;
     }
 
-    // 2) Mirror to fittrial-command-center via supabaseCC.
-    const { error: ccError } = await supabaseCC
-      .from("gyms")
-      .update({ invite_code: code })
-      .eq("id", gymId);
-
-    if (ccError) {
-      // Roll back primary so neither side saves.
-      await supabase
-        .from("gyms")
-        .update({ invite_code: previousCode })
-        .eq("id", gymId);
+    const { error: rpcErr } = await supabase.rpc("regenerate_invite_code", { code_type: "manager" });
+    if (rpcErr) {
       setInviteLoading(false);
-      toast.error(`Could not sync code to command center: ${ccError.message}`);
+      toast.error(`Could not regenerate code: ${rpcErr.message}`);
       return;
     }
+
+    const { data: biz, error: bizErr } = await supabase
+      .from("businesses")
+      .select("invite_code, staff_invite_code")
+      .eq("id", profile.business_id)
+      .single();
 
     setInviteLoading(false);
-    setInviteCode(updated.invite_code ?? code);
+    if (bizErr) {
+      toast.error(`Could not load new code: ${bizErr.message}`);
+      return;
+    }
+    setInviteCode(biz?.invite_code ?? "");
+    setStaffInviteCode(biz?.staff_invite_code ?? "");
     toast.success("New invite code generated");
   };
 
@@ -711,16 +687,44 @@ const Index = () => {
   };
 
   const regenerateStaffInviteCode = async () => {
-    if (!gymId) { toast.error("No gym linked to your account."); return; }
+    if (!user) {
+      toast.error("No business is linked to your account.");
+      return;
+    }
     setStaffInviteLoading(true);
-    const code = "STF-" + generateCode();
-    const { error } = await (supabase as any)
-      .from("gyms")
-      .update({ staff_invite_code: code })
-      .eq("id", gymId);
+
+    const { data: profile, error: profileErr } = await supabase
+      .from("profiles")
+      .select("business_id, role")
+      .eq("id", user.id)
+      .single();
+
+    if (profileErr || !profile?.business_id) {
+      setStaffInviteLoading(false);
+      toast.error("No business is linked to your account.");
+      return;
+    }
+
+    const { error: rpcErr } = await supabase.rpc("regenerate_invite_code", { code_type: "staff" });
+    if (rpcErr) {
+      setStaffInviteLoading(false);
+      toast.error(`Could not regenerate staff code: ${rpcErr.message}`);
+      return;
+    }
+
+    const { data: biz, error: bizErr } = await supabase
+      .from("businesses")
+      .select("invite_code, staff_invite_code")
+      .eq("id", profile.business_id)
+      .single();
+
     setStaffInviteLoading(false);
-    if (error) { toast.error(`Could not regenerate staff code: ${error.message}`); return; }
-    setStaffInviteCode(code);
+    if (bizErr) {
+      toast.error(`Could not load new code: ${bizErr.message}`);
+      return;
+    }
+    setInviteCode(biz?.invite_code ?? "");
+    setStaffInviteCode(biz?.staff_invite_code ?? "");
     toast.success("New staff invite code generated");
   };
 
@@ -732,7 +736,7 @@ const Index = () => {
 
 
   const currentLabel = navigation.find(item => item.key === activeView)?.label ?? "Dashboard";
-  const gymName = gym?.gym_name ?? APP_NAME;
+  const gymName = gym?.workspace_name ?? APP_NAME;
   const totalAlerts = inboxBadge;
   const isInboxView = activeView === "inbox";
 
@@ -757,7 +761,7 @@ const Index = () => {
         : "All clear today";
 
   const handleApplyOnboardingConfig = async (cfg: ConfigData) => {
-    if (!gymId) return;
+    if (!businessId) return;
     const update: Record<string, unknown> = {};
     if (cfg.ai_name) update.ai_name = cfg.ai_name;
     if (cfg.ai_personality) update.persona = { personality: cfg.ai_personality };
@@ -781,7 +785,7 @@ const Index = () => {
     }
     if (cfg.demo_mode?.enabled !== undefined) update.demo_mode = cfg.demo_mode.enabled;
     if (cfg.demo_mode?.keyword) update.demo_trigger_word = cfg.demo_mode.keyword;
-    await (supabase as any).from("business_configs").update(update).eq("business_id", gymId);
+    await (supabase as any).from("business_configs").update(update).eq("business_id", businessId);
     if (cfg.qualification_strictness) setQualificationStrictness(cfg.qualification_strictness);
     if (cfg.bad_lead_definition) setBadLeadDefinition(cfg.bad_lead_definition);
     toast.success("AI configured! Your settings have been updated.");
@@ -986,7 +990,7 @@ const Index = () => {
                           .map(c => (
                             <div key={c.id} className="flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
                               <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
-                              <p className="text-sm text-foreground/90">Reply to {c.user_name ?? c.user_id}</p>
+                              <p className="text-sm text-foreground/90">Reply to {c.name ?? c.id}</p>
                             </div>
                           ))}
                         {bookings
@@ -996,7 +1000,7 @@ const Index = () => {
                             <div key={b.id} className="flex items-start gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3">
                               <span className="mt-1 h-2.5 w-2.5 rounded-full bg-primary" />
                               <p className="text-sm text-foreground/90">
-                                Confirm {b.name ?? "lead"} for {b.preferred_day ?? "—"} at {b.preferred_time ?? "—"}
+                                Confirm {b.name ?? "lead"} for {b.booking_date ?? "—"} at {b.booking_time ?? "—"}
                               </p>
                             </div>
                           ))}
@@ -1106,7 +1110,7 @@ const Index = () => {
                             <div className="space-y-2 lg:space-y-0">
                               <p className="font-medium text-foreground">{displayName(booking.name)}</p>
                               <div className="flex flex-wrap gap-2 text-xs text-muted-foreground lg:hidden">
-                                <span>{displayDash(booking.phone)}</span><span>•</span><span>{titleCase(booking.source)}</span><span>•</span><span>{resolvePreferredDay(booking.preferred_day)}</span>
+                                <span>{displayDash(booking.phone)}</span><span>•</span><span>{titleCase(booking.source)}</span><span>•</span><span>{displayDash(booking.booking_date)}</span>
                               </div>
                             </div>
                             <p className="hidden text-muted-foreground lg:block">{displayDash(booking.phone)}</p>
@@ -1116,8 +1120,8 @@ const Index = () => {
                               </span>
                             </div>
                             <p className="hidden text-muted-foreground lg:block">{titleCase(booking.source)}</p>
-                            <p className="hidden text-foreground/80 lg:block">{resolvePreferredDay(booking.preferred_day)}</p>
-                            <p className="hidden text-foreground/80 lg:block">{displayDash(booking.preferred_time)}</p>
+                            <p className="hidden text-foreground/80 lg:block">{displayDash(booking.booking_date)}</p>
+                            <p className="hidden text-foreground/80 lg:block">{displayDash(booking.booking_time)}</p>
                           </button>
 
                           {expanded && (
@@ -1129,8 +1133,8 @@ const Index = () => {
                                     <div><p className="fit-label">Full name</p><p className="fit-value">{displayName(booking.name)}</p></div>
                                     <div><p className="fit-label">Phone number</p><p className="fit-value">{displayDash(booking.phone)}</p></div>
                                     <div><p className="fit-label">Source</p><p className="fit-value">{titleCase(booking.source)}</p></div>
-                                    <div><p className="fit-label">Preferred day</p><p className="fit-value">{resolvePreferredDay(booking.preferred_day)}</p></div>
-                                    <div><p className="fit-label">Preferred time</p><p className="fit-value">{displayDash(booking.preferred_time)}</p></div>
+                                    <div><p className="fit-label">Preferred day</p><p className="fit-value">{displayDash(booking.booking_date)}</p></div>
+                                    <div><p className="fit-label">Preferred time</p><p className="fit-value">{displayDash(booking.booking_time)}</p></div>
                                     <div><p className="fit-label">Created at</p><p className="fit-value">{formatDateTime(booking.created_at)}</p></div>
                                   </div>
                                 </div>
@@ -1145,7 +1149,7 @@ const Index = () => {
                                 </div>
                                 <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] p-4">
                                   <p className="fit-label">{industry.lead} reference</p>
-                                  <p className="mt-3 text-sm leading-6 text-foreground/90">{booking.user_id}</p>
+                                  <p className="mt-3 text-sm leading-6 text-foreground/90">{booking.contact_id}</p>
                                 </div>
                               </div>
                               <div className="mt-5">
@@ -1424,7 +1428,7 @@ const Index = () => {
 
               {activeView === "inbox" && (
                 <InboxView
-                  gymName={gym?.gym_name ?? gymName}
+                  gymName={gym?.workspace_name ?? gymName}
                   quickReplies={quickReplies}
                   onOpened={refreshInboxBadge}
                   initialConversationId={inboxInitialConversationId}
@@ -1833,7 +1837,7 @@ const Index = () => {
                     <div className="dashboard-panel p-5 md:p-6">
                       <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Workspace</p>
                       <h2 className="mt-2 text-lg font-semibold text-foreground">
-                        {gym?.gym_name ?? <span className="italic text-muted-foreground/70">e.g. Iron Forge Strength Co.</span>}
+                        {gym?.workspace_name ?? <span className="italic text-muted-foreground/70">e.g. Iron Forge Strength Co.</span>}
                       </h2>
                       <div className="mt-5 grid gap-4 sm:grid-cols-2">
                         <div>
@@ -2029,7 +2033,7 @@ const Index = () => {
       isOpen={showOnboarding}
       onClose={() => setShowOnboarding(false)}
       onApplyConfig={handleApplyOnboardingConfig}
-      gymId={gymId}
+      businessId={businessId}
     />
     </>
   );

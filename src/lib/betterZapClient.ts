@@ -15,12 +15,10 @@ export const betterZapClient = createClient(
 
 export type EscalatedQuestion = {
   id: string;
-  contact_id: string;
-  contact_name: string | null;
-  message: string;
-  platform: string | null;
+  contact_id: string | null;
+  question: string | null;
   resolved: boolean | null;
   resolved_at: string | null;
   created_at: string | null;
-  gym_id: string;
+  business_id: string;
 };

@@ -35,12 +35,12 @@ const LoginPage = () => {
     }
     let slug: string | null = null;
     if (prof?.business_id) {
-      const { data: gym } = await supabase
-        .from("gyms")
-        .select("slug")
+      const { data: business } = await supabase
+        .from("businesses")
+        .select("custom_domain")
         .eq("id", prof.business_id)
         .maybeSingle();
-      slug = gym?.slug ?? null;
+      slug = business?.custom_domain ?? null;
     }
     if (slug) navigate(`/gym/${slug}/overview`, { replace: true });
     else navigate("/overview", { replace: true });

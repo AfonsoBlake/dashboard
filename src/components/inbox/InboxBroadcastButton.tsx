@@ -27,7 +27,7 @@ const BETTER_ZAP_ANON =
 
 type FilterKey = "all" | "hot" | "warm" | "cold" | "booked";
 
-type Convo = { id: string; lead_status: string | null; conversation_tag: string | null };
+type Convo = { id: string; score: string | null; conversation_tag: string | null };
 
 const FILTER_LABEL: Record<FilterKey, string> = {
   all: "All Contacts",
@@ -38,7 +38,7 @@ const FILTER_LABEL: Record<FilterKey, string> = {
 };
 
 function matches(c: Convo, f: FilterKey): boolean {
-  const ls = (c.lead_status ?? "").toLowerCase();
+  const ls = (c.score ?? "").toLowerCase();
   const tag = (c.conversation_tag ?? "").toLowerCase();
   switch (f) {
     case "all":
@@ -55,7 +55,7 @@ function matches(c: Convo, f: FilterKey): boolean {
 }
 
 export function InboxBroadcastButton() {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const [open, setOpen] = useState(false);
   const [message, setMessage] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
@@ -63,14 +63,14 @@ export function InboxBroadcastButton() {
   const [sending, setSending] = useState(false);
 
   const refresh = useCallback(async () => {
-    if (!gymId) return;
+    if (!businessId) return;
     const { data, error } = await (supabase as any)
       .from("contacts")
-      .select("id, lead_status, conversation_tag")
-      .eq("business_id", gymId);
+      .select("id, score, conversation_tag")
+      .eq("business_id", businessId);
     if (error || !data) return;
     setConvos(data as Convo[]);
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     if (open) refresh();

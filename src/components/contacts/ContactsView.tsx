@@ -51,24 +51,24 @@ type Props = {
 };
 
 export function ContactsView({ onOpenConversation }: Props) {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<"All" | "Hot" | "Warm" | "Cold">("All");
 
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       const [convosRes, bookingsRes] = await Promise.all([
         (supabase as any)
           .from("contacts")
-          .select("id, user_id, user_name, lead_status, last_message_at, escalation_reason, ai_paused")
-          .eq("business_id", gymId)
-          .order("last_message_at", { ascending: false, nullsFirst: false }),
-        (supabase as any).from("bookings").select("user_id, phone, name").eq("business_id", gymId),
+          .select("id, name, score, updated_at, escalation_reason, ai_paused")
+          .eq("business_id", businessId)
+          .order("updated_at", { ascending: false, nullsFirst: false }),
+        (supabase as any).from("bookings").select("contact_id, phone, name").eq("business_id", businessId),
       ]);
       if (cancelled) return;
 
@@ -76,24 +76,24 @@ export function ContactsView({ onOpenConversation }: Props) {
       const bookingName = new Map<string, string | null>();
       const bookingCount = new Map<string, number>();
       (bookingsRes.data ?? []).forEach((b: any) => {
-        bookingCount.set(b.user_id, (bookingCount.get(b.user_id) ?? 0) + 1);
-        if (b.phone && !bookingPhone.has(b.user_id)) bookingPhone.set(b.user_id, b.phone);
-        if (b.name && !bookingName.has(b.user_id)) bookingName.set(b.user_id, b.name);
+        bookingCount.set(b.contact_id, (bookingCount.get(b.contact_id) ?? 0) + 1);
+        if (b.phone && !bookingPhone.has(b.contact_id)) bookingPhone.set(b.contact_id, b.phone);
+        if (b.name && !bookingName.has(b.contact_id)) bookingName.set(b.contact_id, b.name);
       });
 
       const seen = new Set<string>();
       const list: Contact[] = [];
       (convosRes.data ?? []).forEach((c: any) => {
-        if (seen.has(c.user_id)) return;
-        seen.add(c.user_id);
+        if (seen.has(c.id)) return;
+        seen.add(c.id);
         list.push({
-          user_id: c.user_id,
+          user_id: c.id,
           conversation_id: c.id,
-          name: c.user_name || bookingName.get(c.user_id) || "",
-          phone: bookingPhone.get(c.user_id) ?? null,
-          lead_status: c.lead_status ?? null,
-          bookings_count: bookingCount.get(c.user_id) ?? 0,
-          last_message_at: c.last_message_at,
+          name: c.name || bookingName.get(c.id) || "",
+          phone: bookingPhone.get(c.id) ?? null,
+          lead_status: c.score ?? null,
+          bookings_count: bookingCount.get(c.id) ?? 0,
+          last_message_at: c.updated_at,
           escalation_reason: c.escalation_reason,
           ai_paused: !!c.ai_paused,
         });
@@ -105,7 +105,7 @@ export function ContactsView({ onOpenConversation }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [gymId]);
+  }, [businessId]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

@@ -121,7 +121,7 @@ function lastUserWaitMinutes(c: ConversationRow): number | null {
   if (!last) return null;
   const role = (last.role ?? "").toLowerCase();
   if (role !== "user") return null;
-  const ts = last.timestamp ?? c.last_message_at;
+  const ts = last.timestamp ?? c.updated_at;
   if (!ts) return null;
   return (Date.now() - new Date(ts).getTime()) / 60000;
 }
@@ -167,24 +167,24 @@ function playPing() {
 }
 
 export function useInboxBadge() {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const [count, setCount] = useState(0);
   // Track message counts per conversation so we can detect *new* user messages
   const msgCountsRef = useRef<Map<string, number>>(new Map());
   const seededRef = useRef(false);
 
   const refresh = useCallback(async () => {
-    if (!gymId) return;
+    if (!businessId) return;
     const [{ data }, escalatedRes] = await Promise.all([
       (supabase as any)
         .from("contacts")
-        .select("id, user_name, user_id, messages, last_message_at")
-        .eq("business_id", gymId),
+        .select("id, name, messages, updated_at")
+        .eq("business_id", businessId),
       betterZapClient
         .from("escalated_questions")
         .select("id", { count: "exact", head: true })
         .eq("resolved", false)
-        .eq("business_id", gymId),
+        .eq("business_id", businessId),
     ]);
     if (!data) return;
     const rows = data as unknown as ConversationRow[];
@@ -198,7 +198,7 @@ export function useInboxBadge() {
       msgCountsRef.current = map;
       seededRef.current = true;
     }
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     refresh();
@@ -207,12 +207,12 @@ export function useInboxBadge() {
   }, [refresh]);
 
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     const channel = supabase
-      .channel(`inbox-badge-${gymId}`)
+      .channel(`inbox-badge-${businessId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "contacts", filter: `business_id=eq.${gymId}` },
+        { event: "*", schema: "public", table: "contacts", filter: `business_id=eq.${businessId}` },
         (payload) => {
           // Detect new incoming user message globally → ping + browser notification
           const row = (payload.new ?? null) as ConversationRow | null;
@@ -231,7 +231,7 @@ export function useInboxBadge() {
                   Notification.permission === "granted"
                 ) {
                   try {
-                    const name = displayName(row.user_name);
+                    const name = displayName(row.name);
                     const body = (last?.content ?? last?.text ?? "New message").slice(0, 140);
                     new Notification(`New message from ${name}`, { body });
                   } catch {
@@ -249,7 +249,7 @@ export function useInboxBadge() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [gymId, refresh]);
+  }, [businessId, refresh]);
 
   return { count, refresh };
 }
@@ -262,7 +262,7 @@ type InboxViewProps = {
 };
 
 export function InboxView({ gymName, quickReplies, onOpened, initialConversationId }: InboxViewProps) {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const isMobile = useIsMobile();
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -295,16 +295,16 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   const [bulkAiBusy, setBulkAiBusy] = useState(false);
 
   const loadEscalated = useCallback(async () => {
-    if (!gymId) {
-      console.log("[escalated] skipped — no gymId yet");
+    if (!businessId) {
+      console.log("[escalated] skipped — no businessId yet");
       return;
     }
-    console.log("[escalated] querying for gym_id =", gymId);
+    console.log("[escalated] querying for business_id =", businessId);
     const { data, error } = await betterZapClient
       .from("escalated_questions")
       .select("*")
       .eq("resolved", false)
-      .eq("business_id", gymId)
+      .eq("business_id", businessId)
       .order("created_at", { ascending: false });
     console.log("[escalated] result", { count: data?.length ?? 0, data, error });
     if (error) {
@@ -312,7 +312,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
       return;
     }
     setEscalated((data ?? []) as EscalatedQuestion[]);
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     loadEscalated();
@@ -333,16 +333,16 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
     const BETTER_ZAP_ANON =
       "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxka3J4YnBvaXhvb2tyd21kdWZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMxMzU5NzQsImV4cCI6MjA4ODcxMTk3NH0.ED2WltgKqUfl149-EwW34vsGgNSn7l1jC7b16Pw68Ow";
 
-    // Resolve the actual conversations.id from the escalated question's contact_id + gym_id.
+    // Resolve the actual conversations.id from the escalated question's contact_id + business_id.
     // The escalated_questions row id is NOT a conversation id — sending it would point at the wrong record.
     let conversationId: string | null = null;
     try {
       const { data: convo, error: convoErr } = await (supabase as any)
         .from("contacts")
         .select("id")
-        .eq("business_id", selectedEscalated.gym_id)
-        .eq("user_id", selectedEscalated.contact_id)
-        .order("last_message_at", { ascending: false, nullsFirst: false })
+        .eq("business_id", selectedEscalated.business_id)
+        .eq("id", selectedEscalated.contact_id)
+        .order("updated_at", { ascending: false, nullsFirst: false })
         .limit(1)
         .maybeSingle();
       if (convoErr) {
@@ -409,19 +409,19 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
 
   // Initial load
   const loadConversations = useCallback(async () => {
-    if (!gymId) return;
+    if (!businessId) return;
     setLoading(true);
     const { data, error } = await (supabase as any)
       .from("contacts")
       .select("*")
-      .eq("business_id", gymId)
-      .order("last_message_at", { ascending: false, nullsFirst: false });
+      .eq("business_id", businessId)
+      .order("updated_at", { ascending: false, nullsFirst: false });
     if (error) {
       toast.error("Inbox unavailable. Please refresh.");
     }
     setConversations((data ?? []) as unknown as ConversationRow[]);
     setLoading(false);
-  }, [gymId]);
+  }, [businessId]);
 
   useEffect(() => {
     loadConversations();
@@ -429,12 +429,12 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
 
   // Realtime subscription for conversations table
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     const channel = supabase
-      .channel(`inbox-${gymId}`)
+      .channel(`inbox-${businessId}`)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "contacts", filter: `business_id=eq.${gymId}` },
+        { event: "*", schema: "public", table: "contacts", filter: `business_id=eq.${businessId}` },
         (payload) => {
           setConversations((prev) => {
             const row = (payload.new ?? payload.old) as ConversationRow | undefined;
@@ -447,8 +447,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
             if (idx >= 0) newList[idx] = row;
             // resort by last_message_at desc
             newList.sort((a, b) => {
-              const at = a.last_message_at ? new Date(a.last_message_at).getTime() : 0;
-              const bt = b.last_message_at ? new Date(b.last_message_at).getTime() : 0;
+              const at = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+              const bt = b.updated_at ? new Date(b.updated_at).getTime() : 0;
               return bt - at;
             });
             return newList;
@@ -459,7 +459,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [gymId]);
+  }, [businessId]);
 
   // Mark "opened" — parent can clear badge
   useEffect(() => {
@@ -501,18 +501,18 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   // Bookings count for selected user
   useEffect(() => {
     (async () => {
-      if (!gymId || !selected) {
+      if (!businessId || !selected) {
         setBookingsCount(0);
         return;
       }
       const { count } = await (supabase as any)
         .from("bookings")
         .select("id", { count: "exact", head: true })
-        .eq("business_id", gymId)
-        .eq("user_id", selected.user_id);
+        .eq("business_id", businessId)
+        .eq("id", selected.id);
       setBookingsCount(count ?? 0);
     })();
-  }, [gymId, selected]);
+  }, [businessId, selected]);
 
   // Auto-scroll to bottom on selection or new message
   useEffect(() => {
@@ -531,7 +531,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
         playPing();
         if (typeof Notification !== "undefined" && Notification.permission === "granted") {
           try {
-            new Notification(displayName(selected.user_name), {
+            new Notification(displayName(selected.name), {
               body: (last.content ?? last.text ?? "New message").slice(0, 120),
             });
           } catch {
@@ -621,7 +621,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
 
   const suggestInFlightRef = useRef(false);
   async function requestSuggestion(intent: "default" | "book" | "objection" | "follow_up") {
-    if (!selected || !gymId) return;
+    if (!selected || !businessId) return;
     if (suggestInFlightRef.current) return;
     suggestInFlightRef.current = true;
     setSuggestLoading(true);
@@ -638,11 +638,6 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
       }
       const payload = data as { suggested_reply: string; lead_score: ScoreLabel; lead_score_reason: string };
       setSuggestion(payload);
-      // Persist AI score to conversation row
-      await (supabase as any)
-        .from("contacts")
-        .update({ ai_score: payload.lead_score, ai_score_reason: payload.lead_score_reason })
-        .eq("id", selected.id);
     } finally {
       setSuggestLoading(false);
       suggestInFlightRef.current = false;
@@ -650,7 +645,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   }
 
   async function sendReply() {
-    if (!selected || !gymId || !reply.trim()) return;
+    if (!selected || !businessId || !reply.trim()) return;
     setSending(true);
     const text = reply.trim();
 
@@ -708,16 +703,16 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   async function setLeadStatus(c: ConversationRow, status: ManualStatus) {
     // Optimistic update so the pill flips instantly
     setConversations((prev) =>
-      prev.map((row) => (row.id === c.id ? { ...row, lead_status: status } : row)),
+      prev.map((row) => (row.id === c.id ? { ...row, score: status } : row)),
     );
     const { error } = await (supabase as any)
       .from("contacts")
-      .update({ lead_status: status })
+      .update({ score: status })
       .eq("id", c.id);
     if (error) {
       // Roll back on failure
       setConversations((prev) =>
-        prev.map((row) => (row.id === c.id ? { ...row, lead_status: c.lead_status ?? null } : row)),
+        prev.map((row) => (row.id === c.id ? { ...row, score: c.score ?? null } : row)),
       );
       toast.error(`Could not save status: ${error.message}`);
       return;
@@ -752,7 +747,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   }
 
   async function bulkSetAiPaused(paused: boolean) {
-    if (!gymId) return;
+    if (!businessId) return;
     setBulkAiBusy(true);
     const nowIso = new Date().toISOString();
     const prev = conversations;
@@ -774,7 +769,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
     const { error } = await (supabase as any)
       .from("contacts")
       .update(payload)
-      .eq("business_id", gymId);
+      .eq("business_id", businessId);
     setBulkAiBusy(false);
     setBulkAiDialogOpen(false);
     if (error) {
@@ -889,8 +884,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                       </AlertDialogTitle>
                       <AlertDialogDescription>
                         {allPaused
-                          ? `This will re-enable AI auto-replies for all ${total} conversations in this gym.`
-                          : `This will pause AI auto-replies for all ${total} conversations in this gym. Replies will be manual only until you resume.`}
+                          ? `This will re-enable AI auto-replies for all ${total} conversations in this business.`
+                          : `This will pause AI auto-replies for all ${total} conversations in this business. Replies will be manual only until you resume.`}
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
@@ -949,13 +944,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex min-w-0 flex-wrap items-center gap-2">
                         <p className="truncate text-base font-semibold text-foreground">
-                          {e.contact_name ?? e.contact_id}
+                          {e.contact_id ?? "Unknown contact"}
                         </p>
-                        {e.platform && (
-                          <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-                            {e.platform}
-                          </span>
-                        )}
                       </div>
                       <span
                         className="inline-flex shrink-0 items-center"
@@ -984,8 +974,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
             {visibleChats.map((c) => {
               const wait = lastUserWaitMinutes(c);
               const stale = wait !== null && wait >= STALE_MIN;
-              const score = (c.ai_score ?? null) as ScoreLabel | null;
-              const status = (c.lead_status ?? null) as ManualStatus | null;
+              const status = (c.score ?? null) as ManualStatus | null;
               const tagVal = (c.conversation_tag ?? null) as string | null;
               const last = getMessages(c).slice(-1)[0];
               const preview = (last?.content ?? last?.text ?? "—").slice(0, 90);
@@ -1018,7 +1007,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                           />
                         )}
                         <p className="truncate text-base font-semibold text-foreground">
-                          {displayName(c.user_name)}
+                          {displayName(c.name)}
                         </p>
                         {(c as ConversationRow & { escalation_reason?: string | null }).escalation_reason && (
                           <span className="shrink-0 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
@@ -1038,7 +1027,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                           stale ? "font-semibold text-primary" : "text-muted-foreground",
                         )}
                       >
-                        {wait !== null ? formatWait(wait) : formatTime(c.last_message_at)}
+                        {wait !== null ? formatWait(wait) : formatTime(c.updated_at)}
                       </span>
                     </div>
                   </button>
@@ -1183,7 +1172,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                     </div>
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-foreground">
-                        {displayName(selected.user_name)}
+                        {displayName(selected.name)}
                       </p>
                       {(selected as ConversationRow & { escalation_reason?: string | null }).escalation_reason && (
                         <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-600 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
@@ -1316,8 +1305,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                             type="button"
                             className="mt-1 flex w-full items-center justify-between rounded-md text-sm text-foreground hover:opacity-90"
                           >
-                            {selected.lead_status && STATUS_PILL[selected.lead_status as ManualStatus] ? (
-                              <StatusPill status={selected.lead_status as ManualStatus} />
+                            {selected.score && STATUS_PILL[selected.score as ManualStatus] ? (
+                              <StatusPill status={selected.score as ManualStatus} />
                             ) : (
                               <span className="text-muted-foreground">Set status</span>
                             )}
@@ -1342,15 +1331,15 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                         AI Suggestion
                       </p>
                       <div className="mt-1">
-                        {selected.ai_score && SCORE_PILL[selected.ai_score as ScoreLabel] ? (
-                          <StatusPill status={selected.ai_score as ScoreLabel} />
+                        {suggestion?.lead_score && SCORE_PILL[suggestion.lead_score] ? (
+                          <StatusPill status={suggestion.lead_score} />
                         ) : (
                           <span className="text-sm italic text-muted-foreground">AI: Analyzing…</span>
                         )}
                       </div>
-                      {selected.ai_score_reason && (
+                      {suggestion?.lead_score_reason && (
                         <p className="mt-2 line-clamp-2 text-xs italic text-muted-foreground">
-                          {selected.ai_score_reason}
+                          {suggestion.lead_score_reason}
                         </p>
                       )}
                     </div>

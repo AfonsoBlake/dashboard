@@ -16,533 +16,705 @@ export type Database = {
     Tables: {
       bookings: {
         Row: {
-          created_at: string | null
-          gym_id: string
+          booking_date: string | null
+          booking_time: string | null
+          business_id: string
+          contact_id: string
+          created_at: string
           id: string
           location: string | null
           name: string | null
+          notes: string | null
           phone: string | null
-          preferred_day: string | null
-          preferred_time: string | null
           source: string | null
-          status: string | null
-          user_id: string
+          status: string
         }
         Insert: {
-          created_at?: string | null
-          gym_id: string
+          booking_date?: string | null
+          booking_time?: string | null
+          business_id: string
+          contact_id: string
+          created_at?: string
           id?: string
           location?: string | null
           name?: string | null
+          notes?: string | null
           phone?: string | null
-          preferred_day?: string | null
-          preferred_time?: string | null
           source?: string | null
-          status?: string | null
-          user_id: string
+          status?: string
         }
         Update: {
-          created_at?: string | null
-          gym_id?: string
+          booking_date?: string | null
+          booking_time?: string | null
+          business_id?: string
+          contact_id?: string
+          created_at?: string
           id?: string
           location?: string | null
           name?: string | null
+          notes?: string | null
           phone?: string | null
-          preferred_day?: string | null
-          preferred_time?: string | null
           source?: string | null
-          status?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      conversations: {
-        Row: {
-          ai_paused: boolean
-          ai_paused_at: string | null
-          ai_score: string | null
-          ai_score_reason: string | null
-          conversation_tag: string | null
-          created_at: string | null
-          escalated_at: string | null
-          escalation_reason: string | null
-          gym_id: string
-          id: string
-          last_message_at: string | null
-          last_staff_reply_at: string | null
-          lead_status: string | null
-          messages: Json | null
-          resolved_at: string | null
-          status: string | null
-          user_id: string
-          user_name: string | null
-        }
-        Insert: {
-          ai_paused?: boolean
-          ai_paused_at?: string | null
-          ai_score?: string | null
-          ai_score_reason?: string | null
-          conversation_tag?: string | null
-          created_at?: string | null
-          escalated_at?: string | null
-          escalation_reason?: string | null
-          gym_id: string
-          id?: string
-          last_message_at?: string | null
-          last_staff_reply_at?: string | null
-          lead_status?: string | null
-          messages?: Json | null
-          resolved_at?: string | null
-          status?: string | null
-          user_id: string
-          user_name?: string | null
-        }
-        Update: {
-          ai_paused?: boolean
-          ai_paused_at?: string | null
-          ai_score?: string | null
-          ai_score_reason?: string | null
-          conversation_tag?: string | null
-          created_at?: string | null
-          escalated_at?: string | null
-          escalation_reason?: string | null
-          gym_id?: string
-          id?: string
-          last_message_at?: string | null
-          last_staff_reply_at?: string | null
-          lead_status?: string | null
-          messages?: Json | null
-          resolved_at?: string | null
-          status?: string | null
-          user_id?: string
-          user_name?: string | null
+          status?: string
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_gym_id_fkey"
-            columns: ["gym_id"]
+            foreignKeyName: "bookings_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: "gym_configs"
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
       }
-      customer_summaries: {
+      business_assets: {
         Row: {
-          gym_id: string
+          asset_type: string | null
+          business_id: string
+          created_at: string | null
+          description: string
           id: string
-          last_updated: string | null
-          summary: string | null
+          tag_key: string | null
+          tags: string[] | null
+          url: string
+        }
+        Insert: {
+          asset_type?: string | null
+          business_id: string
+          created_at?: string | null
+          description: string
+          id?: string
+          tag_key?: string | null
+          tags?: string[] | null
+          url: string
+        }
+        Update: {
+          asset_type?: string | null
+          business_id?: string
+          created_at?: string | null
+          description?: string
+          id?: string
+          tag_key?: string | null
+          tags?: string[] | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_assets_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_configs: {
+        Row: {
+          ai_goal: string | null
+          ai_name: string | null
+          ai_personality: string | null
+          bad_lead_definition: string | null
+          bio: string | null
+          booking_fields: Json | null
+          business_id: string | null
+          business_type: string | null
+          chat_response_style: string | null
+          created_at: string
+          custom_instructions: string | null
+          demo_mode: boolean | null
+          demo_trigger_word: string | null
+          escalation_contact: string | null
+          escalation_enabled: boolean | null
+          escalation_rules: Json | null
+          follow_up_delay_hours: number | null
+          follow_up_enabled: boolean | null
+          follow_up_max: number | null
+          follow_up_tone: string | null
+          goals: Json | null
+          id: string
+          invite_code: string | null
+          knowledge: Json | null
+          lead_silent_hours: number | null
+          manager_name: string | null
+          manychat_api_key: string | null
+          model: string | null
+          niche: string | null
+          onboarding_complete: boolean | null
+          persona: Json | null
+          photo_map: Json | null
+          qualification_questions: Json | null
+          qualification_strictness: string | null
+          specific_keywords: string[] | null
+          staff_invite_code: string | null
+          system_prompt: string | null
+          trial_mode: boolean | null
+          workspace_name: string | null
+        }
+        Insert: {
+          ai_goal?: string | null
+          ai_name?: string | null
+          ai_personality?: string | null
+          bad_lead_definition?: string | null
+          bio?: string | null
+          booking_fields?: Json | null
+          business_id?: string | null
+          business_type?: string | null
+          chat_response_style?: string | null
+          created_at?: string
+          custom_instructions?: string | null
+          demo_mode?: boolean | null
+          demo_trigger_word?: string | null
+          escalation_contact?: string | null
+          escalation_enabled?: boolean | null
+          escalation_rules?: Json | null
+          follow_up_delay_hours?: number | null
+          follow_up_enabled?: boolean | null
+          follow_up_max?: number | null
+          follow_up_tone?: string | null
+          goals?: Json | null
+          id?: string
+          invite_code?: string | null
+          knowledge?: Json | null
+          lead_silent_hours?: number | null
+          manager_name?: string | null
+          manychat_api_key?: string | null
+          model?: string | null
+          niche?: string | null
+          onboarding_complete?: boolean | null
+          persona?: Json | null
+          photo_map?: Json | null
+          qualification_questions?: Json | null
+          qualification_strictness?: string | null
+          specific_keywords?: string[] | null
+          staff_invite_code?: string | null
+          system_prompt?: string | null
+          trial_mode?: boolean | null
+          workspace_name?: string | null
+        }
+        Update: {
+          ai_goal?: string | null
+          ai_name?: string | null
+          ai_personality?: string | null
+          bad_lead_definition?: string | null
+          bio?: string | null
+          booking_fields?: Json | null
+          business_id?: string | null
+          business_type?: string | null
+          chat_response_style?: string | null
+          created_at?: string
+          custom_instructions?: string | null
+          demo_mode?: boolean | null
+          demo_trigger_word?: string | null
+          escalation_contact?: string | null
+          escalation_enabled?: boolean | null
+          escalation_rules?: Json | null
+          follow_up_delay_hours?: number | null
+          follow_up_enabled?: boolean | null
+          follow_up_max?: number | null
+          follow_up_tone?: string | null
+          goals?: Json | null
+          id?: string
+          invite_code?: string | null
+          knowledge?: Json | null
+          lead_silent_hours?: number | null
+          manager_name?: string | null
+          manychat_api_key?: string | null
+          model?: string | null
+          niche?: string | null
+          onboarding_complete?: boolean | null
+          persona?: Json | null
+          photo_map?: Json | null
+          qualification_questions?: Json | null
+          qualification_strictness?: string | null
+          specific_keywords?: string[] | null
+          staff_invite_code?: string | null
+          system_prompt?: string | null
+          trial_mode?: boolean | null
+          workspace_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_configs_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: true
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_members: {
+        Row: {
+          business_id: string
+          created_at: string
+          id: string
+          role: string
           user_id: string
         }
         Insert: {
-          gym_id: string
+          business_id: string
+          created_at?: string
           id?: string
-          last_updated?: string | null
-          summary?: string | null
+          role?: string
           user_id: string
         }
         Update: {
-          gym_id?: string
+          business_id?: string
+          created_at?: string
           id?: string
-          last_updated?: string | null
-          summary?: string | null
+          role?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "business_members_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      businesses: {
+        Row: {
+          config_id: string | null
+          created_at: string
+          custom_domain: string | null
+          display_name: string
+          id: string
+          invite_code: string | null
+          logo_url: string | null
+          staff_invite_code: string | null
+        }
+        Insert: {
+          config_id?: string | null
+          created_at?: string
+          custom_domain?: string | null
+          display_name: string
+          id?: string
+          invite_code?: string | null
+          logo_url?: string | null
+          staff_invite_code?: string | null
+        }
+        Update: {
+          config_id?: string | null
+          created_at?: string
+          custom_domain?: string | null
+          display_name?: string
+          id?: string
+          invite_code?: string | null
+          logo_url?: string | null
+          staff_invite_code?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "businesses_config_id_fkey"
+            columns: ["config_id"]
+            isOneToOne: false
+            referencedRelation: "business_configs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          ai_activated: boolean | null
+          ai_activated_at: string | null
+          ai_paused: boolean
+          ai_processing: boolean | null
+          ai_processing_at: string | null
+          business_id: string
+          conversation_state: Json | null
+          conversation_tag: string | null
+          created_at: string
+          email: string | null
+          escalated_at: string | null
+          escalation_reason: string | null
+          follow_up_count: number | null
+          follow_up_scheduled_at: string | null
+          follow_up_sent_at: string | null
+          goal: string | null
+          id: string
+          last_staff_reply_at: string | null
+          location: string | null
+          messages: Json
+          name: string | null
+          notes: string | null
+          paused_at: string | null
+          paused_by: string | null
+          phone: string | null
+          platform: string | null
+          platform_id: string | null
+          resolved_at: string | null
+          score: string | null
+          score_reason: string | null
+          source: string | null
+          status: string
+          summary: string | null
+          updated_at: string
+        }
+        Insert: {
+          ai_activated?: boolean | null
+          ai_activated_at?: string | null
+          ai_paused?: boolean
+          ai_processing?: boolean | null
+          ai_processing_at?: string | null
+          business_id: string
+          conversation_state?: Json | null
+          conversation_tag?: string | null
+          created_at?: string
+          email?: string | null
+          escalated_at?: string | null
+          escalation_reason?: string | null
+          follow_up_count?: number | null
+          follow_up_scheduled_at?: string | null
+          follow_up_sent_at?: string | null
+          goal?: string | null
+          id?: string
+          last_staff_reply_at?: string | null
+          location?: string | null
+          messages?: Json
+          name?: string | null
+          notes?: string | null
+          paused_at?: string | null
+          paused_by?: string | null
+          phone?: string | null
+          platform?: string | null
+          platform_id?: string | null
+          resolved_at?: string | null
+          score?: string | null
+          score_reason?: string | null
+          source?: string | null
+          status?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Update: {
+          ai_activated?: boolean | null
+          ai_activated_at?: string | null
+          ai_paused?: boolean
+          ai_processing?: boolean | null
+          ai_processing_at?: string | null
+          business_id?: string
+          conversation_state?: Json | null
+          conversation_tag?: string | null
+          created_at?: string
+          email?: string | null
+          escalated_at?: string | null
+          escalation_reason?: string | null
+          follow_up_count?: number | null
+          follow_up_scheduled_at?: string | null
+          follow_up_sent_at?: string | null
+          goal?: string | null
+          id?: string
+          last_staff_reply_at?: string | null
+          location?: string | null
+          messages?: Json
+          name?: string | null
+          notes?: string | null
+          paused_at?: string | null
+          paused_by?: string | null
+          phone?: string | null
+          platform?: string | null
+          platform_id?: string | null
+          resolved_at?: string | null
+          score?: string | null
+          score_reason?: string | null
+          source?: string | null
+          status?: string
+          summary?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      conversation_examples: {
+        Row: {
+          business_id: string | null
+          created_at: string | null
+          emotion: string | null
+          example_text: string
+          id: string
+          intent_tags: string[] | null
+          language: string | null
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string | null
+          emotion?: string | null
+          example_text: string
+          id?: string
+          intent_tags?: string[] | null
+          language?: string | null
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string | null
+          emotion?: string | null
+          example_text?: string
+          id?: string
+          intent_tags?: string[] | null
+          language?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_examples_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       escalated_questions: {
         Row: {
-          contact_id: string
-          contact_name: string | null
-          created_at: string | null
-          gym_id: string
+          business_id: string
+          contact_id: string | null
+          created_at: string
           id: string
-          message: string
-          platform: string | null
-          resolved: boolean | null
+          question: string | null
+          resolved: boolean
           resolved_at: string | null
         }
         Insert: {
-          contact_id: string
-          contact_name?: string | null
-          created_at?: string | null
-          gym_id: string
+          business_id: string
+          contact_id?: string | null
+          created_at?: string
           id?: string
-          message: string
-          platform?: string | null
-          resolved?: boolean | null
+          question?: string | null
+          resolved?: boolean
           resolved_at?: string | null
         }
         Update: {
-          contact_id?: string
-          contact_name?: string | null
-          created_at?: string | null
-          gym_id?: string
+          business_id?: string
+          contact_id?: string | null
+          created_at?: string
           id?: string
-          message?: string
-          platform?: string | null
-          resolved?: boolean | null
+          question?: string | null
+          resolved?: boolean
           resolved_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "escalated_questions_gym_id_fkey"
-            columns: ["gym_id"]
+            foreignKeyName: "escalated_questions_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: "gym_configs"
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "escalated_questions_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedback: {
+        Row: {
+          business_id: string
+          category: string | null
+          comment: string | null
+          contact_id: string | null
+          created_at: string
+          id: string
+          rating: number | null
+          submitted_by: string | null
+        }
+        Insert: {
+          business_id: string
+          category?: string | null
+          comment?: string | null
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          rating?: number | null
+          submitted_by?: string | null
+        }
+        Update: {
+          business_id?: string
+          category?: string | null
+          comment?: string | null
+          contact_id?: string | null
+          created_at?: string
+          id?: string
+          rating?: number | null
+          submitted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedback_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
       }
       follow_ups: {
         Row: {
-          created_at: string | null
-          follow_up_message: string | null
+          business_id: string
+          contact_id: string
+          created_at: string
           follow_up_type: string | null
-          gym_id: string
           id: string
-          status: string | null
-          user_id: string
+          message: string | null
+          scheduled_at: string | null
+          sent: boolean
+          sent_at: string | null
         }
         Insert: {
-          created_at?: string | null
-          follow_up_message?: string | null
-          follow_up_type?: string | null
-          gym_id: string
-          id?: string
-          status?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          follow_up_message?: string | null
-          follow_up_type?: string | null
-          gym_id?: string
-          id?: string
-          status?: string | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      gym_configs: {
-        Row: {
-          bio: string | null
-          closing_time: string | null
-          created_at: string | null
-          email: string | null
-          escalation_contact: string | null
-          escalation_enabled: boolean | null
-          gym_name: string
-          id: string
-          logo_url: string | null
-          manager_name: string | null
-          manychat_api_key: string | null
-          model: string | null
-          opening_time: string | null
-          phone: string | null
-          photo_map: Json | null
-          quick_replies: Json | null
-          system_prompt: string
-        }
-        Insert: {
-          bio?: string | null
-          closing_time?: string | null
-          created_at?: string | null
-          email?: string | null
-          escalation_contact?: string | null
-          escalation_enabled?: boolean | null
-          gym_name: string
-          id: string
-          logo_url?: string | null
-          manager_name?: string | null
-          manychat_api_key?: string | null
-          model?: string | null
-          opening_time?: string | null
-          phone?: string | null
-          photo_map?: Json | null
-          quick_replies?: Json | null
-          system_prompt: string
-        }
-        Update: {
-          bio?: string | null
-          closing_time?: string | null
-          created_at?: string | null
-          email?: string | null
-          escalation_contact?: string | null
-          escalation_enabled?: boolean | null
-          gym_name?: string
-          id?: string
-          logo_url?: string | null
-          manager_name?: string | null
-          manychat_api_key?: string | null
-          model?: string | null
-          opening_time?: string | null
-          phone?: string | null
-          photo_map?: Json | null
-          quick_replies?: Json | null
-          system_prompt?: string
-        }
-        Relationships: []
-      }
-      feedback: {
-        Row: {
-          ai_reply: string | null
+          business_id: string
           contact_id: string
-          contact_name: string | null
-          created_at: string | null
-          gym_id: string
-          id: string
-          message: string
-          platform: string | null
-          status: string
-        }
-        Insert: {
-          ai_reply?: string | null
-          contact_id: string
-          contact_name?: string | null
-          created_at?: string | null
-          gym_id: string
+          created_at?: string
+          follow_up_type?: string | null
           id?: string
-          message: string
-          platform?: string | null
-          status?: string
+          message?: string | null
+          scheduled_at?: string | null
+          sent?: boolean
+          sent_at?: string | null
         }
         Update: {
-          ai_reply?: string | null
+          business_id?: string
           contact_id?: string
-          contact_name?: string | null
-          created_at?: string | null
-          gym_id?: string
+          created_at?: string
+          follow_up_type?: string | null
           id?: string
-          message?: string
-          platform?: string | null
-          status?: string
+          message?: string | null
+          scheduled_at?: string | null
+          sent?: boolean
+          sent_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "feedback_gym_id_fkey"
-            columns: ["gym_id"]
+            foreignKeyName: "follow_ups_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: "gym_configs"
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "follow_ups_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
             referencedColumns: ["id"]
           },
         ]
       }
-      gym_users: {
+      notify_list: {
         Row: {
-          created_at: string | null
-          gym_id: string | null
-          id: string
-          user_id: string | null
+          created_at: string
+          email: string | null
+          id: number
+          instagram: boolean
         }
         Insert: {
-          created_at?: string | null
-          gym_id?: string | null
-          id?: string
-          user_id?: string | null
+          created_at?: string
+          email?: string | null
+          id?: never
+          instagram?: boolean
         }
         Update: {
-          created_at?: string | null
-          gym_id?: string | null
-          id?: string
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "gym_users_gym_id_fkey"
-            columns: ["gym_id"]
-            isOneToOne: false
-            referencedRelation: "gyms"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      gyms: {
-        Row: {
-          booking_subtitle: string | null
-          booking_title: string | null
-          city: string | null
-          created_at: string | null
-          display_name: string | null
-          gym_config_id: string | null
-          hero_image_url: string | null
-          id: string
-          invite_code: string | null
-          is_active: boolean | null
-          logo_url: string | null
-          max_trials_per_person: number | null
-          name: string
-          notes: string | null
-          primary_color: string | null
-          slug: string | null
-          social_media_handle: string | null
-          status: string | null
-          timezone: string | null
-        }
-        Insert: {
-          booking_subtitle?: string | null
-          booking_title?: string | null
-          city?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          gym_config_id?: string | null
-          hero_image_url?: string | null
-          id?: string
-          invite_code?: string | null
-          is_active?: boolean | null
-          logo_url?: string | null
-          max_trials_per_person?: number | null
-          name: string
-          notes?: string | null
-          primary_color?: string | null
-          slug?: string | null
-          social_media_handle?: string | null
-          status?: string | null
-          timezone?: string | null
-        }
-        Update: {
-          booking_subtitle?: string | null
-          booking_title?: string | null
-          city?: string | null
-          created_at?: string | null
-          display_name?: string | null
-          gym_config_id?: string | null
-          hero_image_url?: string | null
-          id?: string
-          invite_code?: string | null
-          is_active?: boolean | null
-          logo_url?: string | null
-          max_trials_per_person?: number | null
-          name?: string
-          notes?: string | null
-          primary_color?: string | null
-          slug?: string | null
-          social_media_handle?: string | null
-          status?: string | null
-          timezone?: string | null
-        }
-        Relationships: []
-      }
-      human_mode: {
-        Row: {
-          activated_at: string | null
-          gym_id: string
-          id: string
-          is_human_mode: boolean | null
-          user_id: string
-        }
-        Insert: {
-          activated_at?: string | null
-          gym_id: string
-          id?: string
-          is_human_mode?: boolean | null
-          user_id: string
-        }
-        Update: {
-          activated_at?: string | null
-          gym_id?: string
-          id?: string
-          is_human_mode?: boolean | null
-          user_id?: string
-        }
-        Relationships: []
-      }
-      lead_tags: {
-        Row: {
-          created_at: string | null
-          experience: string | null
-          goal: string | null
-          gym_id: string
-          id: string
-          objection: string | null
-          status: string | null
-          user_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          experience?: string | null
-          goal?: string | null
-          gym_id: string
-          id?: string
-          objection?: string | null
-          status?: string | null
-          user_id: string
-        }
-        Update: {
-          created_at?: string | null
-          experience?: string | null
-          goal?: string | null
-          gym_id?: string
-          id?: string
-          objection?: string | null
-          status?: string | null
-          user_id?: string
+          created_at?: string
+          email?: string | null
+          id?: never
+          instagram?: boolean
         }
         Relationships: []
       }
       profiles: {
         Row: {
           approval_status: string
-          approved_at: string | null
-          created_at: string | null
-          custom_business_description: string | null
-          email: string
+          business_description: string | null
+          business_id: string | null
+          business_type: string | null
+          created_at: string
           full_name: string | null
-          gym_id: string | null
           id: string
-          industry_id: string | null
+          niche: string | null
+          role: string
         }
         Insert: {
           approval_status?: string
-          approved_at?: string | null
-          created_at?: string | null
-          custom_business_description?: string | null
-          email: string
+          business_description?: string | null
+          business_id?: string | null
+          business_type?: string | null
+          created_at?: string
           full_name?: string | null
-          gym_id?: string | null
           id: string
-          industry_id?: string | null
+          niche?: string | null
+          role?: string
         }
         Update: {
           approval_status?: string
-          approved_at?: string | null
-          created_at?: string | null
-          custom_business_description?: string | null
-          email?: string
+          business_description?: string | null
+          business_id?: string | null
+          business_type?: string | null
+          created_at?: string
           full_name?: string | null
-          gym_id?: string | null
           id?: string
-          industry_id?: string | null
+          niche?: string | null
+          role?: string
         }
         Relationships: [
           {
-            foreignKeyName: "profiles_gym_id_fkey"
-            columns: ["gym_id"]
+            foreignKeyName: "profiles_business_id_fkey"
+            columns: ["business_id"]
             isOneToOne: false
-            referencedRelation: "gyms"
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
       }
-      user_roles: {
+      quiz_responses: {
         Row: {
-          created_at: string
+          created_at: string | null
           id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          q1: string
+          q2: string
+          q3: string
+          q4: string
+          q5: string
         }
         Insert: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
+          q1: string
+          q2: string
+          q3: string
+          q4: string
+          q5: string
         }
         Update: {
-          created_at?: string
+          created_at?: string | null
           id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
+          q1?: string
+          q2?: string
+          q3?: string
+          q4?: string
+          q5?: string
         }
         Relationships: []
       }
@@ -552,7 +724,10 @@ export type Database = {
     }
     Functions: {
       append_message:
-        | { Args: { p_convo_id: string; p_message: Json }; Returns: undefined }
+        | {
+            Args: { p_contact_id: string; p_message: Json }
+            Returns: undefined
+          }
         | {
             Args: {
               p_content: string
@@ -564,6 +739,7 @@ export type Database = {
             }
             Returns: Json
           }
+      current_business_id: { Args: never; Returns: string }
       get_burst_messages: {
         Args: { p_convo_id: string; p_window_seconds?: number }
         Returns: string
@@ -577,21 +753,18 @@ export type Database = {
             Args: { p_gym_id: string; p_limit?: number; p_user_id: string }
             Returns: Json
           }
-      has_role: {
-        Args: {
-          _role: Database["public"]["Enums"]["app_role"]
-          _user_id: string
-        }
-        Returns: boolean
-      }
+      has_role:
+        | {
+            Args: {
+              _role: Database["public"]["Enums"]["app_role"]
+              _user_id: string
+            }
+            Returns: boolean
+          }
+        | { Args: { _role: string; _user_id: string }; Returns: boolean }
       is_approved: { Args: never; Returns: boolean }
-      validate_invite_code: {
-        Args: { code: string }
-        Returns: {
-          gym_name: string
-          valid: boolean
-        }[]
-      }
+      regenerate_invite_code: { Args: { code_type: string }; Returns: string }
+      validate_invite_code: { Args: { code: string }; Returns: Json }
     }
     Enums: {
       app_role: "admin" | "manager" | "user"

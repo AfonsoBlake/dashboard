@@ -4,7 +4,7 @@ import { useAuth } from "./useAuth";
 
 type GymContextValue = {
   gymConfigId: string | null;
-  gymId: string | null;
+  businessId: string | null;
   gymSlug: string | null;
   loading: boolean;
   error: string | null;
@@ -12,7 +12,7 @@ type GymContextValue = {
 
 const GymCtx = createContext<GymContextValue>({
   gymConfigId: null,
-  gymId: null,
+  businessId: null,
   gymSlug: null,
   loading: true,
   error: null,
@@ -22,7 +22,7 @@ export const GymProvider = ({ children }: { children: ReactNode }) => {
   const { user, loading: authLoading } = useAuth();
   const [state, setState] = useState<GymContextValue>({
     gymConfigId: null,
-    gymId: null,
+    businessId: null,
     gymSlug: null,
     loading: true,
     error: null,
@@ -36,7 +36,7 @@ export const GymProvider = ({ children }: { children: ReactNode }) => {
       return;
     }
     if (!user) {
-      setState({ gymConfigId: null, gymId: null, gymSlug: null, loading: false, error: null });
+      setState({ gymConfigId: null, businessId: null, gymSlug: null, loading: false, error: null });
       return;
     }
 
@@ -49,30 +49,30 @@ export const GymProvider = ({ children }: { children: ReactNode }) => {
 
       if (cancelled) return;
       if (profileErr) {
-        setState({ gymConfigId: null, gymId: null, gymSlug: null, loading: false, error: profileErr.message });
+        setState({ gymConfigId: null, businessId: null, gymSlug: null, loading: false, error: profileErr.message });
         return;
       }
       if (!profile?.business_id) {
-        setState({ gymConfigId: null, gymId: null, gymSlug: null, loading: false, error: null });
+        setState({ gymConfigId: null, businessId: null, gymSlug: null, loading: false, error: null });
         return;
       }
 
       const { data: gym, error: gymErr } = await supabase
-        .from("gyms")
-        .select("gym_config_id, slug")
+        .from("businesses")
+        .select("config_id, custom_domain")
         .eq("id", profile.business_id)
         .maybeSingle();
 
       if (cancelled) return;
       if (gymErr) {
-        setState({ gymConfigId: null, gymId: profile.business_id, gymSlug: null, loading: false, error: gymErr.message });
+        setState({ gymConfigId: null, businessId: profile.business_id, gymSlug: null, loading: false, error: gymErr.message });
         return;
       }
 
       setState({
-        gymConfigId: gym?.gym_config_id ?? null,
-        gymId: profile.business_id,
-        gymSlug: gym?.slug ?? null,
+        gymConfigId: gym?.config_id ?? null,
+        businessId: profile.business_id,
+        gymSlug: gym?.custom_domain ?? null,
         loading: false,
         error: null,
       });

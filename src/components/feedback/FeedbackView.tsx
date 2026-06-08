@@ -26,7 +26,7 @@ function statusBadge(status: string) {
 }
 
 export function FeedbackView() {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const { setUnreadCount, setIsOnFeedbackPage, onNewFeedback } = useFeedback();
   const [rows, setRows] = useState<FeedbackRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -39,14 +39,14 @@ export function FeedbackView() {
 
   // Initial load + mark unread as read (once)
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       const { data, error } = await supabase
         .from("feedback")
         .select("*")
-        .eq("business_id", String(gymId))
+        .eq("business_id", String(businessId))
         .order("created_at", { ascending: false });
       if (cancelled) return;
       if (error) {
@@ -61,12 +61,12 @@ export function FeedbackView() {
       await supabase
         .from("feedback")
         .update({ status: "read" })
-        .eq("business_id", String(gymId))
+        .eq("business_id", String(businessId))
         .eq("status", "unread");
       setUnreadCount(0);
     })();
     return () => { cancelled = true; };
-  }, [gymId, setUnreadCount]);
+  }, [businessId, setUnreadCount]);
 
   // Listen for incoming realtime feedback while on this page
   useEffect(() => {

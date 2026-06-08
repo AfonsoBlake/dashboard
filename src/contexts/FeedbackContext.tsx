@@ -5,7 +5,7 @@ import { toast } from "sonner";
 
 type FeedbackRow = {
   id: string;
-  gym_id: string;
+  business_id: string;
   contact_id: string;
   contact_name: string | null;
   message: string;
@@ -32,7 +32,7 @@ const Ctx = createContext<FeedbackContextValue>({
 });
 
 export const FeedbackProvider = ({ children }: { children: ReactNode }) => {
-  const { gymId } = useGymContext();
+  const { businessId } = useGymContext();
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOnFeedbackPage, setIsOnFeedbackPage] = useState(false);
   const onPageRef = useRef(false);
@@ -42,25 +42,25 @@ export const FeedbackProvider = ({ children }: { children: ReactNode }) => {
 
   // Initial unread count
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     (async () => {
       const { count } = await supabase
         .from("feedback")
         .select("id", { count: "exact", head: true })
-        .eq("business_id", String(gymId))
+        .eq("business_id", String(businessId))
         .eq("status", "unread");
       setUnreadCount(count ?? 0);
     })();
-  }, [gymId]);
+  }, [businessId]);
 
   // Realtime subscription
   useEffect(() => {
-    if (!gymId) return;
+    if (!businessId) return;
     const channel = supabase
-      .channel(`feedback_${gymId}`)
+      .channel(`feedback_${businessId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "feedback", filter: `business_id=eq.${gymId}` },
+        { event: "INSERT", schema: "public", table: "feedback", filter: `business_id=eq.${businessId}` },
         (payload) => {
           const row = payload.new as FeedbackRow;
           listenersRef.current.forEach((cb) => cb(row));
@@ -80,7 +80,7 @@ export const FeedbackProvider = ({ children }: { children: ReactNode }) => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [gymId]);
+  }, [businessId]);
 
   const onNewFeedback = useCallback((cb: (row: FeedbackRow) => void) => {
     listenersRef.current.add(cb);

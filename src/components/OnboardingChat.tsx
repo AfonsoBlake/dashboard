@@ -41,10 +41,10 @@ type Props = {
   isOpen: boolean;
   onClose: () => void;
   onApplyConfig: (cfg: ConfigData) => void;
-  gymId: string | null;
+  businessId: string | null;
 };
 
-export function OnboardingChat({ isOpen, onClose, onApplyConfig, gymId }: Props) {
+export function OnboardingChat({ isOpen, onClose, onApplyConfig, businessId }: Props) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -72,7 +72,7 @@ export function OnboardingChat({ isOpen, onClose, onApplyConfig, gymId }: Props)
     const { data: cfg } = await (supabase as any)
       .from("business_configs")
       .select("chat_response_style")
-      .eq("business_id", gymId)
+      .eq("business_id", businessId)
       .single();
 
     const { data, error } = await supabase.functions.invoke("Ai-Chat-Dashboard-very-important", {
