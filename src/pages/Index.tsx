@@ -353,7 +353,7 @@ const Index = () => {
   // Team access state
   const [staffInviteCode, setStaffInviteCode] = useState<string>("");
   const [staffInviteLoading, setStaffInviteLoading] = useState(false);
-  const [userRole, setUserRole] = useState<"admin" | "manager" | "user" | null>(null);
+  const [userRole, setUserRole] = useState<"admin" | "manager" | "staff" | "user" | null>(null);
 
   const bookingsState = useBookings();
   const conversationsState = useConversations();
@@ -481,6 +481,8 @@ const Index = () => {
 
   const visibleNavigation = userRole === "user"
     ? navigation.filter(n => n.key === "inbox" || n.key === "feedback")
+    : userRole === "staff"
+    ? navigation.filter(n => n.key !== "ai-configurator")
     : navigation;
 
   useEffect(() => {
@@ -528,9 +530,15 @@ const Index = () => {
         .select("role")
         .eq("id", user.id)
         .maybeSingle();
-      setUserRole((data?.role as "admin" | "manager" | "user") ?? null);
+      setUserRole((data?.role as "admin" | "manager" | "staff" | "user") ?? null);
     })();
   }, [user]);
+
+  useEffect(() => {
+    if (userRole === "staff" && activeView === "ai-configurator") {
+      setActiveView("overview");
+    }
+  }, [userRole, activeView]);
 
   useEffect(() => {
     if (!businessId) {
@@ -1858,6 +1866,8 @@ const Index = () => {
                   </div>
 
                   <div className="space-y-4">
+                    {userRole !== "staff" && (
+                      <>
                     <div className="dashboard-panel p-5 md:p-6">
                       <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Invite code — Manager</p>
                       <h2 className="mt-2 text-lg font-semibold text-foreground">Manager access</h2>
@@ -1929,6 +1939,8 @@ const Index = () => {
                         </Button>
                       </div>
                     </div>
+                      </>
+                    )}
 
                     <div className="dashboard-panel p-5 md:p-6">
                       <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Account</p>
