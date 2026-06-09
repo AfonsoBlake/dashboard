@@ -54,7 +54,7 @@ const PendingVerification = () => {
   return (
     <AuthShell title="ACCOUNT PENDING APPROVAL">
       <p className="mb-6 text-center text-sm text-white/85">
-        Your account has been created and is awaiting review by a gym admin.
+        Your account has been created and is awaiting review.
         You'll get access as soon as it's approved.
       </p>
       <PrimaryButton
