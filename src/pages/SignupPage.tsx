@@ -66,6 +66,20 @@ const SignupPage = () => {
     setFullName(""); setEmail(""); setPassword(""); setError(null);
   };
 
+  const validateCode = async (code: string) => {
+    const { data, error } = await supabase.rpc('validate_invite_code', {
+      code: code.trim().toUpperCase()
+    });
+
+    console.log('Validation result:', data, error);
+
+    if (error || !data || data.valid === false) {
+      return null;
+    }
+
+    return data; // { valid: true, role: 'manager'|'staff', business_id: '...' }
+  };
+
   const onSubmitInvite = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -76,11 +90,11 @@ const SignupPage = () => {
 
     setLoading(true);
 
-    const { data, error: rpcErr } = await supabase.rpc('validate_invite_code', { code: inviteCode.trim().toUpperCase() });
+    const validated = await validateCode(inviteCode);
 
-    if (rpcErr || !data?.[0]?.valid) {
+    if (!validated) {
       setLoading(false);
-      setError("Invalid invite code. Check with your manager or leave blank.");
+      setError("Invalid invite code. Check with your manager.");
       return;
     }
 
