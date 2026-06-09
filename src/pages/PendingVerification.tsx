@@ -22,7 +22,7 @@ const PendingVerification = () => {
         .eq("id", user.id)
         .maybeSingle();
       if (prof?.approval_status === "approved") {
-        navigate("/dashboard", { replace: true });
+        navigate("/overview", { replace: true });
         return;
       }
 
@@ -38,7 +38,7 @@ const PendingVerification = () => {
           },
           (payload: any) => {
             if (payload.new?.approval_status === "approved") {
-              navigate("/dashboard", { replace: true });
+              navigate("/overview", { replace: true });
             }
           }
         )

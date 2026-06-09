@@ -123,7 +123,7 @@ const SignupPage = () => {
       .maybeSingle();
 
     setLoading(false);
-    if (prof?.approval_status === "approved") navigate("/dashboard", { replace: true });
+    if (prof?.approval_status === "approved") navigate("/overview", { replace: true });
     else navigate("/pending-verification", { replace: true });
   };
 
