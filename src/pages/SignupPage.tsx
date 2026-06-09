@@ -1,8 +1,6 @@
 import { useState, FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { industryCategories, industries } from "@/config/industries";
-import { cn } from "@/lib/utils";
 import {
   AuthShell,
   FieldLabel,
@@ -12,13 +10,15 @@ import {
   FieldHelper,
 } from "@/components/auth/AuthShell";
 
+type Step = "entry" | "invite";
+
 const SignupPage = () => {
   const navigate = useNavigate();
+  const [step, setStep] = useState<Step>("entry");
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
-  const [industryId, setIndustryId] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -26,7 +26,7 @@ const SignupPage = () => {
     e.preventDefault();
     setError(null);
 
-    if (!fullName.trim() || !email.trim() || !password || !industryId) {
+    if (!fullName.trim() || !email.trim() || !password || !inviteCode.trim()) {
       setError("All required fields must be filled.");
       return;
     }
@@ -35,72 +35,115 @@ const SignupPage = () => {
       return;
     }
 
-    const trimmedCode = inviteCode.trim();
     setLoading(true);
 
-    if (trimmedCode) {
-      const { data: v, error: rpcErr } = await supabase.rpc("validate_invite_code", {
-        code: trimmedCode,
-      });
-      if (rpcErr || !v?.[0]?.valid) {
-        setLoading(false);
-        setError("Invalid invite code. Check with your gym admin or leave blank.");
-        return;
-      }
+    const { data, error } = await supabase.rpc('validate_invite_code', { code: inviteCode.trim().toUpperCase() });
+
+    if (error || !data?.[0]?.valid) {
+      setLoading(false);
+      setError("Invalid invite code. Check with your manager or leave blank.");
+      return;
     }
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    const { error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/login`,
         data: {
+          invite_code: inviteCode.trim().toUpperCase(),
           full_name: fullName.trim(),
-          invite_code: trimmedCode || null,
-          industry_id: industryId,
         },
       },
     });
 
+    setLoading(false);
+
     if (signUpError) {
-      setLoading(false);
       setError(signUpError.message);
       return;
     }
 
-    await new Promise((r) => setTimeout(r, 500));
-
-    const userId = data.user?.id;
-    if (!userId) {
-      setLoading(false);
-      navigate("/pending-verification", { replace: true });
-      return;
-    }
-
-    const { data: prof } = await supabase
-      .from("profiles")
-      .select("approval_status")
-      .eq("id", userId)
-      .maybeSingle();
-
-    setLoading(false);
-    if (prof?.approval_status === "approved") navigate("/dashboard", { replace: true });
-    else navigate("/pending-verification", { replace: true });
+    navigate("/", { replace: true });
   };
 
-  return (
-    <AuthShell
-      title="CREATE ACCOUNT"
-      footer={
-        <div>
-          Already have access?{" "}
-          <Link to="/login" className="font-bold hover:opacity-80" style={{ color: "#A78BFA" }}>
-            Sign in
-          </Link>
+  const sharedFooter = (
+    <div>
+      Already have access?{" "}
+      <Link to="/login" className="font-bold hover:opacity-80" style={{ color: "#A78BFA" }}>
+        Sign in
+      </Link>
+    </div>
+  );
+
+  if (step === "entry") {
+    return (
+      <AuthShell title="GET STARTED" footer={sharedFooter}>
+        <div className="flex gap-3">
+          <button
+            type="button"
+            onClick={() => setStep("invite")}
+            className="flex-1 rounded-xl p-4 text-left transition active:scale-[0.98]"
+            style={{
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(196, 184, 240, 0.25)",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.09)";
+              (e.currentTarget as HTMLButtonElement).style.border = "1px solid rgba(196,184,240,0.5)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.background = "rgba(255,255,255,0.05)";
+              (e.currentTarget as HTMLButtonElement).style.border = "1px solid rgba(196,184,240,0.25)";
+            }}
+          >
+            <div className="mb-2 text-xl">🔑</div>
+            <div className="text-sm font-bold text-white">I have an invite code</div>
+            <div className="mt-1 text-xs text-white/55">Join an existing workspace</div>
+          </button>
+
+          <div
+            className="flex-1 cursor-not-allowed rounded-xl p-4 text-left opacity-45"
+            style={{
+              background: "rgba(255,255,255,0.03)",
+              border: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <div className="mb-2 text-xl">🏢</div>
+            <div className="text-sm font-bold text-white">Create a new workspace</div>
+            <div className="mt-1 text-xs text-white/55">Set up Fluario for your business</div>
+            <div
+              className="mt-2 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
+              style={{ background: "rgba(124,58,237,0.25)", color: "#A78BFA" }}
+            >
+              Coming soon
+            </div>
+          </div>
         </div>
-      }
-    >
+      </AuthShell>
+    );
+  }
+
+  return (
+    <AuthShell title="CREATE ACCOUNT" footer={sharedFooter}>
       <form onSubmit={onSubmit} className="space-y-4">
+        <button
+          type="button"
+          onClick={() => { setStep("entry"); setError(null); }}
+          className="flex items-center gap-1 text-xs text-white/55 transition hover:text-white/90"
+        >
+          ← Back
+        </button>
+        <div>
+          <FieldLabel>Invite Code</FieldLabel>
+          <FieldInput
+            type="text"
+            placeholder="FLR-59DA"
+            value={inviteCode}
+            onChange={(e) => setInviteCode(e.target.value)}
+            required
+          />
+          <FieldHelper>Enter the code from your manager.</FieldHelper>
+        </div>
         <div>
           <FieldLabel>Full Name</FieldLabel>
           <FieldInput
@@ -133,41 +176,6 @@ const SignupPage = () => {
             autoComplete="new-password"
             required
           />
-        </div>
-        <div>
-          <FieldLabel>What type of business are you?</FieldLabel>
-          <select
-            value={industryId}
-            onChange={(e) => setIndustryId(e.target.value)}
-            required
-            className="flex h-10 w-full items-center justify-between rounded-md border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-foreground ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-[#7C3AED] focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <option value="" disabled className="text-black">Select an industry...</option>
-            {industryCategories.map(cat => (
-              <optgroup key={cat.id} label={`${cat.icon} ${cat.name}`} className="text-black">
-                {cat.niches.map(nicheId => {
-                  const niche = industries.find(i => i.id === nicheId);
-                  if (!niche) return null;
-                  return <option key={niche.id} value={niche.id} className="text-black">{niche.name}</option>;
-                })}
-                {cat.id === "other" && (
-                  <option value="other" className="text-black">Other (Custom)</option>
-                )}
-              </optgroup>
-            ))}
-          </select>
-        </div>
-        <div>
-          <FieldLabel>Invite Code (optional)</FieldLabel>
-          <FieldInput
-            type="text"
-            placeholder="ABC12345"
-            value={inviteCode}
-            onChange={(e) => setInviteCode(e.target.value)}
-          />
-          <FieldHelper>
-            Have a team invite code? Enter it to get instant access.
-          </FieldHelper>
         </div>
         <FieldError>{error}</FieldError>
         <PrimaryButton type="submit" loading={loading}>
