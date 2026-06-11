@@ -311,3 +311,8 @@ html[data-theme="Light"] .dashboard-panel [class*="bg-white/[0.06]"] {
   height: 100% !important;
 }
 
+select option {
+  background-color: #1e1e35;
+  color: #ffffff;
+}
+

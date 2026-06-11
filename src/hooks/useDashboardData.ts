@@ -26,6 +26,7 @@ function useGymScopedTable<T>(
 ) {
   const { businessId, loading: gymLoading, error: gymError } = useGymContext();
   const [state, setState] = useState<State<T | null>>({ data: null, loading: true, error: null });
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -53,9 +54,11 @@ function useGymScopedTable<T>(
     return () => {
       cancelled = true;
     };
-  }, [businessId, gymLoading, gymError]);
+  }, [businessId, gymLoading, gymError, reloadKey]);
 
-  return state;
+  const refetch = useCallback(() => setReloadKey(k => k + 1), []);
+
+  return { ...state, refetch };
 }
 
 export function useBookings() {

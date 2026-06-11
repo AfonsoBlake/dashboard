@@ -40,7 +40,7 @@ type Message = { role: "user" | "assistant"; content: string };
 type Props = {
   isOpen: boolean;
   onClose: () => void;
-  onApplyConfig: (cfg: ConfigData) => void;
+  onApplyConfig: (cfg: ConfigData, messages: Message[]) => void;
   businessId: string | null;
 };
 
@@ -196,15 +196,14 @@ export function OnboardingChat({ isOpen, onClose, onApplyConfig, businessId }: P
                 onKeyDown={e => e.key === "Enter" && sendMessage()}
                 onFocus={() => setInputFocused(true)}
                 onBlur={() => setInputFocused(false)}
-                disabled={!!configData}
                 autoFocus
-                placeholder={configData ? "Config complete" : "Type your answer..."}
+                placeholder="Type your answer..."
                 className="flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground py-1.5"
               />
               <button
                 type="button"
                 onClick={sendMessage}
-                disabled={loading || !!configData}
+                disabled={loading}
                 className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#6366F1] text-white hover:bg-[#6366F1]/90 disabled:opacity-40"
                 aria-label="Send"
               >
@@ -218,7 +217,7 @@ export function OnboardingChat({ isOpen, onClose, onApplyConfig, businessId }: P
           <div className="border-t border-white/[0.06] px-6 py-4">
             <button
               type="button"
-              onClick={() => { onApplyConfig(configData); onClose(); }}
+              onClick={() => { onApplyConfig(configData, messages); onClose(); }}
               className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90"
             >
               ✓ Apply my config

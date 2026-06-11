@@ -34,7 +34,6 @@ import {
   ChevronUp,
   MoreHorizontal,
   Zap,
-  Phone,
   CalendarCheck,
   MessageCircle,
   ArrowLeft,
@@ -66,6 +65,12 @@ const SCORE_PILL: Record<ScoreLabel, PillStyle> = {
   Warm: STATUS_PILL.Warm,
   Cold: STATUS_PILL.Cold,
 };
+
+function temperatureLabel(temperature?: string | null): ScoreLabel | null {
+  if (!temperature) return null;
+  const cap = temperature.charAt(0).toUpperCase() + temperature.slice(1).toLowerCase();
+  return cap === "Hot" || cap === "Warm" || cap === "Cold" ? (cap as ScoreLabel) : null;
+}
 
 function StatusPill({ status }: { status: ManualStatus | ScoreLabel }) {
   const p = STATUS_PILL[status as ManualStatus] ?? SCORE_PILL[status as ScoreLabel];
@@ -144,6 +149,19 @@ function formatWait(min: number): string {
 function formatTime(ts: string | null | undefined): string {
   if (!ts) return "";
   return new Date(ts).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+function timeAgo(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} days ago`;
+  return new Date(dateStr).toLocaleDateString("en-GB", { day: "numeric", month: "short" });
 }
 
 function playPing() {
@@ -271,12 +289,17 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   const [profileOpen, setProfileOpen] = useState(true);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
-  const [suggestion, setSuggestion] = useState<{
-    suggested_reply: string;
-    lead_score: ScoreLabel;
-    lead_score_reason: string;
+  const [aiAnalysis, setAiAnalysis] = useState<{
+    temperature?: string;
+    intent?: string;
+    next_action?: string;
+    summary?: string;
   } | null>(null);
-  const [suggestLoading, setSuggestLoading] = useState(false);
+  const [aiAnalyzing, setAiAnalyzing] = useState(false);
+  const [suggestedReply, setSuggestedReply] = useState<string | null>(null);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [lastSuggestionAction, setLastSuggestionAction] = useState<"book_them" | "handle_objection" | "follow_up" | null>(null);
   const [statsTick, setStatsTick] = useState(0);
   const [bookingsCount, setBookingsCount] = useState(0);
   const [inputHighlight, setInputHighlight] = useState(false);
@@ -538,8 +561,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
             /* ignore */
           }
         }
-        // Auto regenerate suggestion
-        void requestSuggestion("default");
+        // Auto re-analyze on new incoming message
+        void analyzeContact(selected.id);
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -548,9 +571,12 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   // Reset on selection change
   useEffect(() => {
     lastSeenMsgCount.current = selected ? getMessages(selected).length : 0;
-    setSuggestion(null);
+    setAiAnalysis(null);
+    setSuggestedReply(null);
+    setSuggestionError(null);
+    setLastSuggestionAction(null);
     setReply("");
-    if (selected) void requestSuggestion("default");
+    if (selected) void analyzeContact(selected.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selected?.id]);
 
@@ -619,27 +645,73 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
 
   const visibleChats = useMemo(() => filterAndSort(conversations, tab), [conversations, tab]);
 
+  const analyzeRequestIdRef = useRef(0);
+  async function analyzeContact(contactId: string) {
+    if (!businessId) return;
+    const requestId = ++analyzeRequestIdRef.current;
+    setAiAnalysis(null);
+    setAiAnalyzing(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/Smart-reply-dashboard`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            contact_id: contactId,
+            business_id: businessId,
+            action: "analyze",
+          }),
+        },
+      );
+      const data = await res.json();
+      if (requestId !== analyzeRequestIdRef.current) return;
+      setAiAnalysis(data.analysis ?? null);
+    } catch (err) {
+      console.error("Analysis failed:", err);
+    }
+    if (requestId === analyzeRequestIdRef.current) setAiAnalyzing(false);
+  }
+
   const suggestInFlightRef = useRef(false);
-  async function requestSuggestion(intent: "default" | "book" | "objection" | "follow_up") {
+  async function getSuggestion(action: "book_them" | "handle_objection" | "follow_up") {
     if (!selected || !businessId) return;
     if (suggestInFlightRef.current) return;
     suggestInFlightRef.current = true;
-    setSuggestLoading(true);
+    setLastSuggestionAction(action);
+    setSuggestionLoading(true);
+    setSuggestionError(null);
     try {
-      const { data, error } = await supabase.functions.invoke("Smart-reply-dashboard", {
-        body: {
-          conversation_id: selected.id,
-          intent,
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/Smart-reply-dashboard`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session?.access_token}`,
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          },
+          body: JSON.stringify({
+            contact_id: selected.id,
+            business_id: businessId,
+            action,
+          }),
         },
-      });
-      if (error) {
-        toast.error(`Suggestion failed: ${error.message}`);
-        return;
-      }
-      const payload = data as { suggested_reply: string; lead_score: ScoreLabel; lead_score_reason: string };
-      setSuggestion(payload);
+      );
+      if (!res.ok) throw new Error(`${res.status}`);
+      const data = await res.json();
+      setSuggestedReply(data.suggestion ?? null);
+    } catch (err) {
+      setSuggestionError("Could not generate suggestion — try again.");
+      console.error("Suggestion error:", err);
     } finally {
-      setSuggestLoading(false);
+      setSuggestionLoading(false);
       suggestInFlightRef.current = false;
     }
   }
@@ -688,7 +760,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
     // Refresh messages from the source of truth
     await loadConversations();
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-    void requestSuggestion("default");
+    void analyzeContact(selected.id);
   }
 
   async function setConvoTag(c: ConversationRow, tagVal: ConvoTag) {
@@ -840,7 +912,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
       {/* Split view */}
       <div
         className={cn(
-          "grid min-h-0 flex-1 overflow-hidden gap-4 xl:grid-cols-[0.95fr_1.15fr]",
+          "grid min-h-0 flex-1 overflow-hidden gap-4 xl:grid-cols-[320px_1fr]",
           isMobile && (selected || selectedEscalated) ? "grid-cols-1" : "",
         )}
       >
@@ -1116,7 +1188,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
               </div>
               <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6">
                 <div
-                  className="max-w-[70%] rounded-[12px] rounded-bl-[4px] border border-white/[0.06] px-[14px] py-[10px] text-sm leading-6 text-foreground"
+                  className="max-w-[75%] rounded-[12px] rounded-bl-[4px] border border-white/[0.06] px-4 py-3 text-sm leading-6 text-foreground"
                   style={{ backgroundColor: "#1e2030" }}
                 >
                   {selectedEscalated.message}
@@ -1286,9 +1358,12 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                 {profileOpen && (
                   <div className="grid gap-3 px-5 pb-4 md:grid-cols-2 xl:grid-cols-4">
                     <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
-                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Phone</p>
+                      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Last Active</p>
                       <p className="mt-1 flex items-center gap-1 text-sm text-foreground">
-                        <Phone className="h-3 w-3" /> —
+                        {timeAgo(
+                          [...getMessages(selected)].reverse().find((m) => (m.role ?? "").toLowerCase() === "user")
+                            ?.timestamp || selected.updated_at
+                        )}
                       </p>
                     </div>
                     <div className="rounded-xl border border-white/[0.06] bg-white/[0.03] px-3 py-2">
@@ -1330,17 +1405,37 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
                         AI Suggestion
                       </p>
-                      <div className="mt-1">
-                        {suggestion?.lead_score && SCORE_PILL[suggestion.lead_score] ? (
-                          <StatusPill status={suggestion.lead_score} />
-                        ) : (
+                      {!selected ? (
+                        <div className="mt-1">
+                          <span className="text-sm italic text-muted-foreground">Open a conversation to see AI analysis</span>
+                        </div>
+                      ) : aiAnalyzing || !aiAnalysis ? (
+                        <div className="mt-1">
                           <span className="text-sm italic text-muted-foreground">AI: Analyzing…</span>
-                        )}
-                      </div>
-                      {suggestion?.lead_score_reason && (
-                        <p className="mt-2 line-clamp-2 text-xs italic text-muted-foreground">
-                          {suggestion.lead_score_reason}
-                        </p>
+                        </div>
+                      ) : (
+                        <div className="mt-1 max-h-[110px] space-y-1.5 overflow-y-auto pr-1">
+                          {temperatureLabel(aiAnalysis.temperature) && (
+                            <StatusPill status={temperatureLabel(aiAnalysis.temperature)!} />
+                          )}
+                          {aiAnalysis.intent && (
+                            <p className="line-clamp-2 text-xs text-foreground/90">
+                              <span className="text-muted-foreground">Intent: </span>
+                              {aiAnalysis.intent}
+                            </p>
+                          )}
+                          {aiAnalysis.next_action && (
+                            <p className="line-clamp-2 text-xs text-foreground/90">
+                              <span className="text-muted-foreground">Next: </span>
+                              {aiAnalysis.next_action}
+                            </p>
+                          )}
+                          {aiAnalysis.summary && (
+                            <p className="line-clamp-2 text-xs italic text-muted-foreground">
+                              {aiAnalysis.summary}
+                            </p>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1360,11 +1455,11 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                   </p>
                   <button
                     type="button"
-                    onClick={() => requestSuggestion("default")}
-                    disabled={suggestLoading}
+                    onClick={() => lastSuggestionAction && getSuggestion(lastSuggestionAction)}
+                    disabled={suggestionLoading || !lastSuggestionAction}
                     className="flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground disabled:opacity-50"
                   >
-                    <RefreshCw className={cn("h-3 w-3", suggestLoading && "animate-spin")} />
+                    <RefreshCw className={cn("h-3 w-3", suggestionLoading && "animate-spin")} />
                     Regenerate
                   </button>
                 </div>
@@ -1372,31 +1467,31 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                   className="mt-0.5 italic text-foreground/90 line-clamp-3"
                   style={{ fontSize: 13, lineHeight: 1.4 }}
                 >
-                  {suggestLoading
+                  {suggestionLoading
                     ? "Thinking…"
-                    : suggestion?.suggested_reply ?? "Open a conversation to generate a suggestion."}
+                    : suggestionError ?? suggestedReply ?? "Open a conversation to generate a suggestion."}
                 </p>
                 <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => requestSuggestion("book")}
-                    disabled={suggestLoading}
+                    onClick={() => getSuggestion("book_them")}
+                    disabled={suggestionLoading}
                     className="rounded-full border border-white/15 bg-transparent px-2.5 py-1 text-[11px] font-medium text-foreground/80 hover:bg-white/5 disabled:opacity-50"
                   >
                     Book Them
                   </button>
                   <button
                     type="button"
-                    onClick={() => requestSuggestion("objection")}
-                    disabled={suggestLoading}
+                    onClick={() => getSuggestion("handle_objection")}
+                    disabled={suggestionLoading}
                     className="rounded-full border border-white/15 bg-transparent px-2.5 py-1 text-[11px] font-medium text-foreground/80 hover:bg-white/5 disabled:opacity-50"
                   >
                     Handle Objection
                   </button>
                   <button
                     type="button"
-                    onClick={() => requestSuggestion("follow_up")}
-                    disabled={suggestLoading}
+                    onClick={() => getSuggestion("follow_up")}
+                    disabled={suggestionLoading}
                     className="rounded-full border border-white/15 bg-transparent px-2.5 py-1 text-[11px] font-medium text-foreground/80 hover:bg-white/5 disabled:opacity-50"
                   >
                     Follow Up
@@ -1404,13 +1499,13 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
                   <button
                     type="button"
                     onClick={() => {
-                      if (!suggestion) return;
-                      setReply(suggestion.suggested_reply);
+                      if (!suggestedReply) return;
+                      setReply(suggestedReply);
                       setInputHighlight(true);
                       replyInputRef.current?.focus();
                       window.setTimeout(() => setInputHighlight(false), 900);
                     }}
-                    disabled={!suggestion}
+                    disabled={!suggestedReply}
                     className="ml-auto rounded-full bg-primary px-3 py-1 text-[11px] font-semibold text-primary-foreground hover:opacity-90 disabled:opacity-50"
                   >
                     Use This

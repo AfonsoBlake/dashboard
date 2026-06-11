@@ -90,41 +90,61 @@ const SignupPage = () => {
 
     setLoading(true);
 
-    const validated = await validateCode(inviteCode);
+    // Step 1: check if invite code matches a manager code
+    const { data: managerMatch } = await supabase
+      .from("businesses")
+      .select("id")
+      .eq("invite_code", inviteCode.trim().toUpperCase())
+      .maybeSingle();
 
-    if (!validated) {
+    // Step 2: if no manager match, check staff code
+    let businessId = null;
+    let role = null;
+
+    if (managerMatch) {
+      businessId = managerMatch.id;
+      role = "manager";
+    } else {
+      const { data: staffMatch } = await supabase
+        .from("businesses")
+        .select("id")
+        .eq("staff_invite_code", inviteCode.trim().toUpperCase())
+        .maybeSingle();
+
+      if (staffMatch) {
+        businessId = staffMatch.id;
+        role = "staff";
+      } else {
+        setError("Invalid invite code. Check with your manager.");
+        setLoading(false);
+        return;
+      }
+    }
+
+    // Step 3: create auth user
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+
+    if (signUpError || !authData.user) {
+      setError(signUpError?.message ?? "Signup failed. Try again.");
       setLoading(false);
-      setError("Invalid invite code. Check with your manager.");
       return;
     }
 
-    const { data: authData, error: signUpError } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        data: {
-          invite_code: inviteCode.trim().toUpperCase(),
-          full_name: fullName.trim(),
-        },
-      },
-    });
-
-    if (signUpError) { setLoading(false); setError(signUpError.message); return; }
-
-    await new Promise((r) => setTimeout(r, 500));
-
-    const userId = authData.user?.id;
-    if (!userId) { setLoading(false); navigate("/pending-verification", { replace: true }); return; }
-
-    const { data: prof } = await supabase
+    // Step 4: update profile
+    await supabase
       .from("profiles")
-      .select("approval_status")
-      .eq("id", userId)
-      .maybeSingle();
+      .update({
+        business_id: businessId,
+        full_name: fullName,
+        role: role,
+        approval_status: "active",
+      })
+      .eq("id", authData.user.id);
 
-    setLoading(false);
-    if (prof?.approval_status === "approved") navigate("/overview", { replace: true });
-    else navigate("/pending-verification", { replace: true });
+    navigate("/");
   };
 
   const onSubmitNewWorkspace = async (e: FormEvent) => {

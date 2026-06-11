@@ -47,8 +47,7 @@ export const FeedbackProvider = ({ children }: { children: ReactNode }) => {
       const { count } = await supabase
         .from("feedback")
         .select("id", { count: "exact", head: true })
-        .eq("business_id", String(businessId))
-        .eq("status", "unread");
+        .eq("business_id", String(businessId));
       setUnreadCount(count ?? 0);
     })();
   }, [businessId]);

@@ -83,10 +83,10 @@ export function ChatThread({ messages, emptyText = "No messages yet.", className
             >
               <div
                 className={cn(
-                  "max-w-[70%] text-sm leading-6",
+                  "max-w-[75%] text-sm leading-6",
                   fromTeam
-                    ? "bg-gradient-fire text-primary-foreground rounded-[12px] rounded-br-[4px] px-[14px] py-[10px]"
-                    : "text-foreground rounded-[12px] rounded-bl-[4px] px-[14px] py-[10px] border border-white/[0.06]",
+                    ? "bg-gradient-fire text-primary-foreground rounded-[12px] rounded-br-[4px] px-4 py-3"
+                    : "text-foreground rounded-[12px] rounded-bl-[4px] px-4 py-3 border border-white/[0.06]",
                 )}
                 style={fromTeam ? undefined : { backgroundColor: "#1e2030" }}
               >

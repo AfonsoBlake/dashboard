@@ -45,18 +45,18 @@ export const IndustryProvider = ({ children }: { children: ReactNode }) => {
     (async () => {
       const { data, error } = await supabase
         .from("profiles")
-        .select("industry_id, custom_business_description")
+        .select("business_type, business_description")
         .eq("id", user.id)
         .maybeSingle();
 
       if (cancelled) return;
 
       if (!error && data) {
-        if (data.industry_id) {
-          setIndustryIdState(data.industry_id);
+        if (data.business_type) {
+          setIndustryIdState(data.business_type);
         }
-        if (data.custom_business_description) {
-          setCustomDescription(data.custom_business_description);
+        if (data.business_description) {
+          setCustomDescription(data.business_description);
         }
       }
       setLoading(false);
@@ -74,9 +74,9 @@ export const IndustryProvider = ({ children }: { children: ReactNode }) => {
     if (user) {
       await supabase
         .from("profiles")
-        .update({ 
-          industry_id: id, 
-          custom_business_description: customDesc 
+        .update({
+          business_type: id,
+          business_description: customDesc
         })
         .eq("id", user.id);
     }
