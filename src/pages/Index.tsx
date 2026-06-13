@@ -95,6 +95,16 @@ const CONFIGURATOR_CARD_STYLE = {
   boxShadow: "0 0 0 1px rgba(168, 85, 247, 0.1), inset 0 1px 0 rgba(255,255,255,0.04)",
 };
 
+const RESPONSE_LENGTH_OPTIONS: Array<{
+  value: "concise" | "balanced" | "detailed";
+  label: string;
+  subtitle: string;
+}> = [
+  { value: "concise", label: "Concise", subtitle: "Short & punchy. 1-2 bubbles max. Best for fast back-and-forth." },
+  { value: "balanced", label: "Balanced", subtitle: "Conversational. Enough detail without overwhelming." },
+  { value: "detailed", label: "Detailed", subtitle: "Thorough replies. Handles objections and explains fully in one go." },
+];
+
 const VIEW_SUBTITLES: Record<ViewKey, string> = {
   overview: "Snapshot of leads, bookings and conversions.",
   bookings: "All bookings created by your AI or added manually.",
@@ -456,6 +466,12 @@ const Index = () => {
   const [newGoalMetric, setNewGoalMetric] = useState("Bookings");
   const [demoEnabled, setDemoEnabled] = useState(false);
   const [demoKeyword, setDemoKeyword] = useState("fluario");
+  const [demoSaved, setDemoSaved] = useState(false);
+  const demoKeywordDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const demoSavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [responseLengthStyle, setResponseLengthStyle] = useState<"concise" | "balanced" | "detailed">("balanced");
+  const [responseStyleSaved, setResponseStyleSaved] = useState(false);
+  const responseStyleSavedTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [qualQuestions, setQualQuestions] = useState<Array<{ id: string; text: string; expanded: boolean }>>([]);
   const [newQuestionInput, setNewQuestionInput] = useState("");
   const [cantAnswer, setCantAnswer] = useState(false);
@@ -974,7 +990,7 @@ const Index = () => {
     (async () => {
       const { data: rawCfg } = await (supabase as any)
         .from("business_configs")
-        .select("qualification_strictness, bad_lead_definition, repeated_questions, lead_silent_hours, specific_keywords, follow_up_enabled, follow_up_delay_hours, follow_up_max, follow_up_tone, follow_up_steps, ai_name, persona, knowledge, goals, demo_mode, demo_trigger_word, qualification_questions, escalation_rules, contact_phone, contact_email, escalation_channel, business_type, niche")
+        .select("qualification_strictness, bad_lead_definition, lead_silent_hours, specific_keywords, follow_up_enabled, follow_up_delay_hours, follow_up_max, follow_up_tone, follow_up_steps, ai_name, persona, knowledge, goals, demo_mode, demo_trigger_word, response_length_style, qualification_questions, escalation_rules, contact_phone, contact_email, escalation_channel, business_type, niche")
         .eq("business_id", businessId)
         .maybeSingle();
       if (cancelled || !rawCfg) return;
@@ -982,7 +998,6 @@ const Index = () => {
       if (rawCfg.niche) setNiche(rawCfg.niche);
       if (rawCfg.qualification_strictness) setQualificationStrictness(rawCfg.qualification_strictness);
       if (rawCfg.bad_lead_definition != null) setBadLeadDefinition(rawCfg.bad_lead_definition ?? "");
-      if (rawCfg.repeated_questions != null) setRepeatedQuestions(!!rawCfg.repeated_questions);
       if (rawCfg.lead_silent_hours != null) { setLeadSilentEnabled(true); setLeadSilentHours(Number(rawCfg.lead_silent_hours)); }
       if (Array.isArray(rawCfg.specific_keywords)) { setSpecificKeywords(rawCfg.specific_keywords as string[]); if ((rawCfg.specific_keywords as string[]).length > 0) setSpecificKeywordsEnabled(true); }
       if (typeof rawCfg.follow_up_enabled === "boolean") setFollowUpEnabled(rawCfg.follow_up_enabled);
@@ -1005,6 +1020,7 @@ const Index = () => {
       if (Array.isArray(rawCfg.goals)) setGoals(rawCfg.goals as Array<{ id: string; title: string; target: number; metric: string; current?: number }>);
       if (typeof rawCfg.demo_mode === "boolean") setDemoEnabled(rawCfg.demo_mode);
       if (rawCfg.demo_trigger_word) setDemoKeyword(rawCfg.demo_trigger_word);
+      if (rawCfg.response_length_style) setResponseLengthStyle(rawCfg.response_length_style as "concise" | "balanced" | "detailed");
       if (Array.isArray(rawCfg.qualification_questions)) setQualQuestions(rawCfg.qualification_questions as Array<{ id: string; text: string; expanded: boolean }>);
       if (rawCfg.escalation_rules) {
         const er = rawCfg.escalation_rules as Record<string, boolean>;
@@ -1051,10 +1067,59 @@ const Index = () => {
 
   const upsertBusinessConfig = async (patch: Record<string, unknown>) => {
     if (!businessId) return;
-    await (supabase as any)
+    const { error } = await (supabase as any)
       .from("business_configs")
-      .upsert({ business_id: businessId, ...patch }, { onConflict: "business_id" });
+      .update(patch)
+      .eq("business_id", businessId);
+    if (error) {
+      console.error("[config save] failed", error);
+      toast.error(`Could not save: ${error.message}`);
+    }
   };
+
+  // Saves a Demo Mode field and flashes a "Saved" confirmation that fades after 2s.
+  const saveDemoConfig = useCallback(async (patch: Record<string, unknown>) => {
+    if (!businessId) return;
+    const { error } = await (supabase as any)
+      .from("business_configs")
+      .update(patch)
+      .eq("business_id", businessId);
+    if (error) {
+      console.error("[config save] failed", error);
+      toast.error(`Could not save: ${error.message}`);
+      return;
+    }
+    setDemoSaved(true);
+    if (demoSavedTimeoutRef.current) clearTimeout(demoSavedTimeoutRef.current);
+    demoSavedTimeoutRef.current = setTimeout(() => setDemoSaved(false), 2000);
+  }, [businessId]);
+
+  // Clean up any pending demo-mode timers on unmount
+  useEffect(() => {
+    return () => {
+      if (demoKeywordDebounceRef.current) clearTimeout(demoKeywordDebounceRef.current);
+      if (demoSavedTimeoutRef.current) clearTimeout(demoSavedTimeoutRef.current);
+      if (responseStyleSavedTimeoutRef.current) clearTimeout(responseStyleSavedTimeoutRef.current);
+    };
+  }, []);
+
+  // Saves the AI's response length style and flashes a "Saved" confirmation that fades after 1.5s.
+  const saveResponseLengthStyle = useCallback(async (value: "concise" | "balanced" | "detailed") => {
+    if (!businessId) return;
+    setResponseLengthStyle(value);
+    const { error } = await (supabase as any)
+      .from("business_configs")
+      .update({ response_length_style: value })
+      .eq("business_id", businessId);
+    if (error) {
+      console.error("[config save] failed", error);
+      toast.error(`Could not save: ${error.message}`);
+      return;
+    }
+    setResponseStyleSaved(true);
+    if (responseStyleSavedTimeoutRef.current) clearTimeout(responseStyleSavedTimeoutRef.current);
+    responseStyleSavedTimeoutRef.current = setTimeout(() => setResponseStyleSaved(false), 1500);
+  }, [businessId]);
 
   const addFilesToQueue = (files: FileList | File[]) => {
     const newItems = Array.from(files).map(file => ({
@@ -2241,6 +2306,47 @@ const Index = () => {
                       </div>
                     </div>
 
+                    {/* Response Style */}
+                    <div className="dashboard-panel p-5 md:p-6" style={CONFIGURATOR_CARD_STYLE}>
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Response Style</p>
+                          <h2 className="mt-2 text-lg font-semibold text-foreground">How long should replies be?</h2>
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 text-xs font-semibold text-emerald-400 transition-opacity duration-500",
+                            responseStyleSaved ? "opacity-100" : "opacity-0",
+                          )}
+                        >
+                          Saved ✓
+                        </span>
+                      </div>
+                      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        {RESPONSE_LENGTH_OPTIONS.map(opt => {
+                          const selected = responseLengthStyle === opt.value;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => saveResponseLengthStyle(opt.value)}
+                              className={cn(
+                                "rounded-2xl border p-4 text-left transition-colors",
+                                selected
+                                  ? "border-[#6366F1] bg-[#6366F1]/10"
+                                  : "border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.06]"
+                              )}
+                            >
+                              <p className={cn("text-sm font-semibold", selected ? "text-[#A5A8FF]" : "text-foreground")}>
+                                {opt.label}
+                              </p>
+                              <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{opt.subtitle}</p>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
                     {/* Quick Setup */}
                     <div className="dashboard-panel p-5 md:p-6" style={CONFIGURATOR_CARD_STYLE}>
                       <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Quick Setup</p>
@@ -2469,37 +2575,6 @@ const Index = () => {
                             </div>
                           );
                         })}
-                      </div>
-                    </div>
-
-                    {/* Demo Mode */}
-                    <div className="dashboard-panel p-5 md:p-6" style={CONFIGURATOR_CARD_STYLE}>
-                      <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Demo Mode</p>
-                      <h2 className="mt-2 text-lg font-semibold text-foreground">Let prospects test your AI</h2>
-                      <p className="mt-1 text-sm text-muted-foreground">When someone DMs the activation keyword, the AI activates for 10 minutes so they can try it out.</p>
-                      <div className="mt-5 space-y-4">
-                        <div className="flex items-start justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3.5">
-                          <div>
-                            <p className="text-sm font-medium text-foreground">Enable demo mode</p>
-                            <p className="mt-0.5 text-xs text-muted-foreground">Allow anyone to activate your AI by sending the keyword</p>
-                          </div>
-                          <button type="button" onClick={() => { const next = !demoEnabled; setDemoEnabled(next); upsertBusinessConfig({ demo_mode: next }); }} className={cn("relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors", demoEnabled ? "bg-primary" : "bg-white/[0.15]")}>
-                            <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", demoEnabled ? "left-5" : "left-0.5")} />
-                          </button>
-                        </div>
-                        <div>
-                          <p className="fit-label mb-2">Activation keyword</p>
-                          <input
-                            value={demoKeyword}
-                            onChange={e => setDemoKeyword(e.target.value)}
-                            onBlur={() => upsertBusinessConfig({ demo_trigger_word: demoKeyword })}
-                            className="w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-foreground outline-none focus:border-primary/50"
-                          />
-                          <p className="mt-1.5 text-xs text-muted-foreground">The word someone must type to start the AI demo. Default is 'ai' but you can change it to anything.</p>
-                        </div>
-                        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
-                          When someone DMs <span className="font-mono text-primary">"{demoKeyword || "ai"}"</span> → AI activates for 10 minutes
-                        </div>
                       </div>
                     </div>
 
@@ -2733,6 +2808,77 @@ const Index = () => {
                         <div>
                           <p className="fit-label">Model</p>
                           <p className="fit-value">{gym?.model ?? <span className="italic text-muted-foreground/70">e.g. GPT-4o, Claude Sonnet</span>}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="dashboard-panel p-5 md:p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Demo Mode</p>
+                          <h2 className="mt-2 text-lg font-semibold text-foreground">Let prospects test your AI</h2>
+                        </div>
+                        <span
+                          className={cn(
+                            "shrink-0 text-xs font-semibold text-emerald-400 transition-opacity duration-500",
+                            demoSaved ? "opacity-100" : "opacity-0",
+                          )}
+                        >
+                          Saved ✓
+                        </span>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">When someone DMs the activation keyword, the AI activates for 10 minutes so they can try it out.</p>
+                      <div className="mt-5 space-y-4">
+                        <div className="flex items-start justify-between gap-4 rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3.5">
+                          <div>
+                            <p className="text-sm font-medium text-foreground">Enable demo mode</p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">Allow anyone to activate your AI by sending the keyword</p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const next = !demoEnabled;
+                              setDemoEnabled(next);
+                              saveDemoConfig({ demo_mode: next, trial_mode: next });
+                            }}
+                            className={cn("relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors", demoEnabled ? "bg-primary" : "bg-white/[0.15]")}
+                          >
+                            <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all", demoEnabled ? "left-5" : "left-0.5")} />
+                          </button>
+                        </div>
+                        <div>
+                          <p className="fit-label mb-2">Activation keyword</p>
+                          <input
+                            value={demoKeyword}
+                            disabled={!demoEnabled}
+                            onChange={e => {
+                              const val = e.target.value;
+                              setDemoKeyword(val);
+                              if (demoKeywordDebounceRef.current) clearTimeout(demoKeywordDebounceRef.current);
+                              demoKeywordDebounceRef.current = setTimeout(() => {
+                                const normalized = val.trim().toLowerCase();
+                                setDemoKeyword(normalized);
+                                saveDemoConfig({ demo_trigger_word: normalized, trial_mode: demoEnabled });
+                              }, 500);
+                            }}
+                            onBlur={() => {
+                              if (demoKeywordDebounceRef.current) {
+                                clearTimeout(demoKeywordDebounceRef.current);
+                                demoKeywordDebounceRef.current = null;
+                              }
+                              const normalized = demoKeyword.trim().toLowerCase();
+                              setDemoKeyword(normalized);
+                              saveDemoConfig({ demo_trigger_word: normalized, trial_mode: demoEnabled });
+                            }}
+                            className={cn(
+                              "w-full rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-sm text-foreground outline-none transition-opacity focus:border-primary/50",
+                              !demoEnabled && "cursor-not-allowed opacity-40",
+                            )}
+                          />
+                          <p className="mt-1.5 text-xs text-muted-foreground">The word someone must type to start the AI demo. Default is 'ai' but you can change it to anything.</p>
+                        </div>
+                        <div className="rounded-2xl border border-white/[0.06] bg-white/[0.03] px-4 py-3 text-sm text-muted-foreground">
+                          When someone DMs <span className="font-mono text-primary">"{demoKeyword || "ai"}"</span> → AI activates for 10 minutes
                         </div>
                       </div>
                     </div>

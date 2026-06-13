@@ -101,7 +101,7 @@ export function InboxBroadcastButton() {
             apikey: BETTER_ZAP_ANON,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ conversation_id: c.id, message: text }),
+          body: JSON.stringify({ contact_id: c.id, business_id: businessId, message: text }),
         });
         if (res.ok) ok++;
         else fail++;

@@ -151,6 +151,7 @@ export type Database = {
           photo_map: Json | null
           qualification_questions: Json | null
           qualification_strictness: string | null
+          response_length_style: string
           specific_keywords: string[] | null
           staff_invite_code: string | null
           system_prompt: string | null
@@ -192,6 +193,7 @@ export type Database = {
           photo_map?: Json | null
           qualification_questions?: Json | null
           qualification_strictness?: string | null
+          response_length_style?: string
           specific_keywords?: string[] | null
           staff_invite_code?: string | null
           system_prompt?: string | null
@@ -233,6 +235,7 @@ export type Database = {
           photo_map?: Json | null
           qualification_questions?: Json | null
           qualification_strictness?: string | null
+          response_length_style?: string
           specific_keywords?: string[] | null
           staff_invite_code?: string | null
           system_prompt?: string | null

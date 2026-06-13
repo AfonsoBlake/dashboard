@@ -338,10 +338,12 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   }, [businessId]);
 
   useEffect(() => {
+    if (!businessId) return;
     loadEscalated();
     const id = setInterval(loadEscalated, 30_000);
     return () => clearInterval(id);
-  }, [loadEscalated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [businessId]);
 
   const selectedEscalated = useMemo(
     () => escalated.find((e) => e.id === selectedEscalatedId) ?? null,
@@ -396,7 +398,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          conversation_id: conversationId,
+          contact_id: conversationId,
+          business_id: selectedEscalated.business_id,
           message: escalatedReply.trim(),
         }),
       });
@@ -717,7 +720,7 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
   }
 
   async function sendReply() {
-    if (!selected || !businessId || !reply.trim()) return;
+    if (!selected?.id || !businessId || !reply.trim()) return;
     setSending(true);
     const text = reply.trim();
 
@@ -734,7 +737,8 @@ export function InboxView({ gymName, quickReplies, onOpened, initialConversation
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          conversation_id: selected.id,
+          contact_id: selected.id,
+          business_id: businessId,
           message: text,
         }),
       });

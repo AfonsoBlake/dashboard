@@ -33,7 +33,18 @@ export type ConfigData = {
   system_prompt?: string | null;
   escalation_rules?: EscalationRules | null;
   demo_mode?: { enabled?: boolean; keyword?: string } | null;
+  response_length_style?: "concise" | "balanced" | "detailed" | null;
 };
+
+const RESPONSE_STYLE_OPTIONS: Array<{
+  value: "concise" | "balanced" | "detailed";
+  label: string;
+  description: string;
+}> = [
+  { value: "concise", label: "Concise", description: "Short, punchy replies. 1-3 sentences max. Best for quick back-and-forth." },
+  { value: "balanced", label: "Balanced", description: "Conversational length. Enough detail without being overwhelming." },
+  { value: "detailed", label: "Detailed", description: "Thorough responses. Explains fully, lists options, handles objections in one message." },
+];
 
 type Message = { role: "user" | "assistant"; content: string };
 
@@ -49,6 +60,7 @@ export function OnboardingChat({ isOpen, onClose, onApplyConfig, businessId }: P
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [configData, setConfigData] = useState<ConfigData | null>(null);
+  const [responseStyle, setResponseStyle] = useState<"concise" | "balanced" | "detailed">("balanced");
   const [started, setStarted] = useState(false);
   const [inputFocused, setInputFocused] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -110,6 +122,7 @@ export function OnboardingChat({ isOpen, onClose, onApplyConfig, businessId }: P
       setMessages([...newMessages, { role: "assistant", content: data.reply }]);
       if (data.complete && data.config_data) {
         setConfigData(data.config_data);
+        setResponseStyle(data.config_data.response_length_style ?? "balanced");
       }
     } catch {
       setMessages([...newMessages, { role: "assistant", content: "Sorry, hit a snag — try again?" }]);
@@ -214,10 +227,40 @@ export function OnboardingChat({ isOpen, onClose, onApplyConfig, businessId }: P
         )}
 
         {configData && (
-          <div className="border-t border-white/[0.06] px-6 py-4">
+          <div className="border-t border-white/[0.06] px-6 py-4 space-y-3">
+            <div>
+              <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Response Style</p>
+              <p className="mt-1 text-sm text-foreground">How long should the AI's replies be?</p>
+            </div>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {RESPONSE_STYLE_OPTIONS.map((opt) => {
+                const selected = responseStyle === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setResponseStyle(opt.value)}
+                    className={cn(
+                      "rounded-xl border p-3 text-left transition-colors",
+                      selected
+                        ? "border-[#6366F1] bg-[#6366F1]/10"
+                        : "border-white/10 bg-white/[0.03] hover:bg-white/[0.06]"
+                    )}
+                  >
+                    <p className={cn("text-sm font-semibold", selected ? "text-[#A5A8FF]" : "text-foreground")}>
+                      {opt.label}
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{opt.description}</p>
+                  </button>
+                );
+              })}
+            </div>
             <button
               type="button"
-              onClick={() => { onApplyConfig(configData, messages); onClose(); }}
+              onClick={() => {
+                onApplyConfig({ ...configData, response_length_style: responseStyle }, messages);
+                onClose();
+              }}
               className="w-full rounded-xl bg-primary py-3 text-sm font-semibold text-white hover:bg-primary/90"
             >
               ✓ Apply my config
